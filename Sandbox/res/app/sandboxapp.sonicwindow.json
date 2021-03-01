@@ -1,0 +1,9 @@
+{
+  "initialName": "Sandbox App",
+  "saveName": false,
+  "initialSize": "600x400",
+  "saveSize": false,
+  "initialMode": "Windowed",
+  "saveMode": false,
+  "resizable": true
+}
