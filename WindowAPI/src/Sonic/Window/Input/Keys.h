@@ -1,282 +1,246 @@
 #pragma once
+#include <cstdint>
+#include <iostream>
 
 namespace Sonic {
 
-    using Key = uint8_t;
+    struct Key
+    {
+        uint8_t code;
+
+        Key(uint8_t code)
+            : code(code)
+        {
+        }
+
+        inline bool operator==(Key other) const { return code == other.code; }
+        inline bool operator!=(Key other) const { return code != other.code; }
+
+        inline operator size_t() const { return (size_t)code; }
+        inline operator uint8_t() const { return (uint8_t)code; }
+        inline operator int() const { return (int)code; }
+    };
 
     namespace Keys {
 
-        enum : Key
-        {
-            // Windows
+        // Windows
 
-            Backspace = 0x08,
-            Tab = 0x09,
-            Clear = 0x0c,
-            Enter = 0x0d,
-            Shift = 0x10,
-            LeftShift = Shift,
-            Control = 0x11,
-            LeftControl = Control,
-            Alt = 0x12,
-            LeftAlt = Alt,
-            Pause = 0x13,
-            CapsLock = 0x14,
-            ImeKana = 0x15,
-            ImeHangul = 0x15,
-            ImeOn = 0x16,
-            ImeJunja = 0x17,
-            ImeFinal = 0x18,
-            ImeHanja = 0x19,
-            ImeKanji = 0x19,
-            ImeOff = 0x1a,
-            Escape = 0x1b,
-            ImeConvert = 0x01c,
-            ImeNonconvert = 0x1d,
-            ImeAccept = 0x1e,
-            ImeModeChange = 0x1f,
-            Space = 0x20,
-            PageUp = 0x21,
-            PageDown = 0x22,
-            End = 0x23,
-            Home = 0x24,
-            Left = 0x25,
-            ArrowLeft = Left,
-            Up = 0x26,
-            ArrowUp = Up,
-            Right = 0x27,
-            ArrowRight = Right,
-            Down = 0x28,
-            ArrowDown = Down,
-            Select = 0x29,
-            Print = 0x2a,
-            Execute = 0x2b,
-            PrintScreen = 0x2c,
-            Insert = 0x2d,
-            Delete = 0x2e,
-            Help = 0x2f,
+        const Key Backspace = 0x08;
+        const Key Tab = 0x09;
+        const Key Clear = 0x0c;
 
-            _0 = 0x30,
-            _1 = 0x31,
-            _2 = 0x32,
-            _3 = 0x33,
-            _4 = 0x34,
-            _5 = 0x35,
-            _6 = 0x36,
-            _7 = 0x37,
-            _8 = 0x38,
-            _9 = 0x39,
+        const Key Enter = 0x0d;
+        const Key LeftEnter = Enter;
+        const Key NumpadEnter = 0x0f;
 
-            A = 0x41,
-            B = 0x42,
-            C = 0x43,
-            D = 0x44,
-            E = 0x45,
-            F = 0x46,
-            G = 0x47,
-            H = 0x48,
-            I = 0x49,
-            J = 0x4a,
-            K = 0x4b,
-            L = 0x4c,
-            M = 0x4d,
-            N = 0x4e,
-            O = 0x4f,
-            P = 0x50,
-            Q = 0x51,
-            R = 0x52,
-            S = 0x53,
-            T = 0x54,
-            U = 0x55,
-            V = 0x56,
-            W = 0x57,
-            X = 0x58,
-            Y = 0x59,
-            Z = 0x5a,
+        const Key Shift = 0x10;
+        const Key LeftShift = Shift;
 
-            Windows = 0x5b,
-            LeftWindows = Windows,
-            RightWindows = 0x5c,
-            Apps = 0x5d,
-            Sleep = 0x5f,
+        const Key Control = 0x11;
+        const Key LeftControl = Control;
 
-            Numpad0 = 0x60,
-            Numpad1 = 0x61,
-            Numpad2 = 0x62,
-            Numpad3 = 0x63,
-            Numpad4 = 0x64,
-            Numpad5 = 0x65,
-            Numpad6 = 0x66,
-            Numpad7 = 0x67,
-            Numpad8 = 0x68,
-            Numpad9 = 0x69,
+        const Key Alt = 0x12;
+        const Key LeftAlt = Alt;
 
-            Multiply = 0x6a,
-            Add = 0x6b,
-            Seperator = 0x6c,
-            Substract = 0x6d,
-            Decimal = 0x6e,
-            Divide = 0x6f,
+        const Key Pause = 0x13;
 
-            F1 = 0x70,
-            F2 = 0x71,
-            F3 = 0x72,
-            F4 = 0x73,
-            F5 = 0x74,
-            F6 = 0x75,
-            F7 = 0x76,
-            F8 = 0x77,
-            F9 = 0x78,
-            F10 = 0x79,
-            F11 = 0x7a,
-            F12 = 0x7b,
-            F13 = 0x7c,
-            F14 = 0x7d,
-            F15 = 0x7e,
-            F16 = 0x7f,
-            F17 = 0x80,
-            F18 = 0x81,
-            F19 = 0x82,
-            F20 = 0x83,
-            F21 = 0x84,
-            F22 = 0x85,
-            F23 = 0x86,
-            F24 = 0x87,
+        const Key CapsLock = 0x14;
 
-            NumLock = 0x90,
-            Scroll = 0x91,
+        const Key ImeKana = 0x15;
+        const Key ImeHangul = 0x15;
+        const Key ImeOn = 0x16;
+        const Key ImeJunja = 0x17;
+        const Key ImeFinal = 0x18;
+        const Key ImeHanja = 0x19;
+        const Key ImeKanji = 0x19;
+        const Key ImeOff = 0x1a;
 
-            RightShift = Shift, // They appear to be the same, at least on windows
-            // 0xa2 is another left shift?
+        const Key Escape = 0x1b;
 
-            RightControl = 0xa3,
-            // 0xa2 is another left control?
+        const Key ImeConvert = 0x01c;
+        const Key ImeNonconvert = 0x1d;
+        const Key ImeAccept = 0x1e;
+        const Key ImeModeChange = 0x1f;
 
-            RightAlt = 0xa5,
-            // 0xa2 is another left alt?
+        const Key Space = 0x20;
 
-            BrowserBack = 0x46,
-            BrowserForward = 0x47,
-            BrowserRefresh = 0xa8,
-            BrowserStop = 0xa9,
-            BrowserSearch = 0xaa,
-            BrowserFavorites = 0xab,
-            BrowserHome = 0x4c,
+        const Key PageUp = 0x21;
+        const Key PageDown = 0x22;
+        const Key End = 0x23;
+        const Key Home = 0x24;
+        const Key Pos1 = Home;
 
-            VolumeMute = 0xad,
-            VolumeDown = 0x4e,
-            VolumeUp = 0xaf,
+        const Key Left = 0x25;
+        const Key ArrowLeft = Left;
+        const Key Up = 0x26;
+        const Key ArrowUp = Up;
+        const Key Right = 0x27;
+        const Key ArrowRight = Right;
+        const Key Down = 0x28;
+        const Key ArrowDown = Down;
+        const Key Select = 0x29;
+        const Key Print = 0x2a;
+        const Key Execute = 0x2b;
+        const Key PrintScreen = 0x2c;
+        const Key Insert = 0x2d;
+        const Key Delete = 0x2e;
+        const Key Help = 0x2f;
 
-            MediaNextTrack = 0xb0,
-            MediaPreviousTrack = 0xb1,
-            MediaStop = 0xb2,
-            MediaPlay = 0xb3,
-            MediaPause = 0xb3,
+        const Key _0 = 0x30;
+        const Key _1 = 0x31;
+        const Key _2 = 0x32;
+        const Key _3 = 0x33;
+        const Key _4 = 0x34;
+        const Key _5 = 0x35;
+        const Key _6 = 0x36;
+        const Key _7 = 0x37;
+        const Key _8 = 0x38;
+        const Key _9 = 0x39;
 
-            StartMail = 0xb5,
-            SelectMedia = 0xb5,
-            StartApp1 = 0xb6,
-            StartApp2 = 0xb7,
+        const Key A = 0x41;
+        const Key B = 0x42;
+        const Key C = 0x43;
+        const Key D = 0x44;
+        const Key E = 0x45;
+        const Key F = 0x46;
+        const Key G = 0x47;
+        const Key H = 0x48;
+        const Key I = 0x49;
+        const Key J = 0x4a;
+        const Key K = 0x4b;
+        const Key L = 0x4c;
+        const Key M = 0x4d;
+        const Key N = 0x4e;
+        const Key O = 0x4f;
+        const Key P = 0x50;
+        const Key Q = 0x51;
+        const Key R = 0x52;
+        const Key S = 0x53;
+        const Key T = 0x54;
+        const Key U = 0x55;
+        const Key V = 0x56;
+        const Key W = 0x57;
+        const Key X = 0x58;
+        const Key Y = 0x59;
+        const Key Z = 0x5a;
+
+        const Key Windows = 0x5b;
+        const Key LeftWindows = Windows;
+        const Key RightWindows = 0x5c;
+
+        const Key Apps = 0x5d;
+        const Key Sleep = 0x5f;
+
+        const Key Numpad0 = 0x60;
+        const Key Numpad1 = 0x61;
+        const Key Numpad2 = 0x62;
+        const Key Numpad3 = 0x63;
+        const Key Numpad4 = 0x64;
+        const Key Numpad5 = 0x65;
+        const Key Numpad6 = 0x66;
+        const Key Numpad7 = 0x67;
+        const Key Numpad8 = 0x68;
+        const Key Numpad9 = 0x69;
+
+        const Key NumpadMultiply = 0x6a;
+        const Key NumpadAdd = 0x6b;
+
+        const Key Seperator = 0x6c;
+
+        const Key NumpadSubstract = 0x6d;
+        const Key NumpadDecimal = 0x6e;
+        const Key NumpadDivide = 0x6f;
+
+        const Key F1 = 0x70;
+        const Key F2 = 0x71;
+        const Key F3 = 0x72;
+        const Key F4 = 0x73;
+        const Key F5 = 0x74;
+        const Key F6 = 0x75;
+        const Key F7 = 0x76;
+        const Key F8 = 0x77;
+        const Key F9 = 0x78;
+        const Key F10 = 0x79;
+        const Key F11 = 0x7a;
+        const Key F12 = 0x7b;
+        const Key F13 = 0x7c;
+        const Key F14 = 0x7d;
+        const Key F15 = 0x7e;
+        const Key F16 = 0x7f;
+        const Key F17 = 0x80;
+        const Key F18 = 0x81;
+        const Key F19 = 0x82;
+        const Key F20 = 0x83;
+        const Key F21 = 0x84;
+        const Key F22 = 0x85;
+        const Key F23 = 0x86;
+        const Key F24 = 0x87;
+
+        const Key NumLock = 0x90;
+        const Key Scroll = 0x91;
+
+        const Key RightShift = Shift; // They appear to be the same, at least on windows
+        // 0xa2 is another left shift?
+
+        const Key RightControl = 0xa3;
+        // 0xa2 is another left control?
+
+        const Key RightAlt = 0xa5;
+        // 0xa2 is another left alt?
+
+        const Key BrowserBack = 0xa6;
+        const Key BrowserForward = 0xa7;
+        const Key BrowserRefresh = 0xa8;
+        const Key BrowserStop = 0xa9;
+        const Key BrowserSearch = 0xaa;
+        const Key BrowserFavorites = 0xab;
+        const Key BrowserHome = 0xac;
+
+        const Key VolumeMute = 0xad;
+        const Key VolumeDown = 0xae;
+        const Key VolumeUp = 0xaf;
+
+        const Key MediaNextTrack = 0xb0;
+        const Key MediaPreviousTrack = 0xb1;
+        const Key MediaStop = 0xb2;
+        const Key MediaPlay = 0xb3;
+        const Key MediaPause = 0xb3;
+
+        const Key StartMail = 0xb5;
+        const Key SelectMedia = 0xb5;
+        const Key StartApp1 = 0xb6;
+        const Key StartApp2 = 0xb7;
             
-            Oem1 = 0xba,
+        const Key Oem1 = 0xba;
 
-            Plus = 0xbb,
-            Comma = 0xbc,
-            Minus = 0xbd,
-            Period = 0xbe,
+        const Key Plus = 0xbb;
+        const Key Comma = 0xbc;
+        const Key Minus = 0xbd;
+        const Key Period = 0xbe;
 
-            Oem2 = 0xbf,
-            Oem3 = 0xc0,
-            Oem4 = 0xdb,
-            Oem5 = 0xdc,
-            Oem6 = 0xdd,
-            Oem7 = 0xde,
-            Oem8 = 0xdf,
-            Oem102 = 0xe2,
-
-            ImeProcess = 0xe5,
-            Attn = 0xf6,
-            Crsel = 0xf7,
-            ExSel = 0xf8,
-            EraseEOF = 0xf9,
-            Play = 0xfa,
-            Zoom = 0xfb,
-            PA1 = 0xfd,
+        const Key Oem2 = 0xbf;
+        const Key Oem3 = 0xc0;
+        const Key Oem4 = 0xdb;
+        const Key Oem5 = 0xdc;
+        const Key Oem6 = 0xdd;
+        const Key Oem7 = 0xde;
+        const Key Oem8 = 0xdf;
+        const Key Oem102 = 0xe2;
+        
+        const Key ImeProcess = 0xe5;
+        const Key Attn = 0xf6;
+        const Key Crsel = 0xf7;
+        const Key ExSel = 0xf8;
+        const Key EraseEOF = 0xf9;
+        const Key Play = 0xfa;
+        const Key Zoom = 0xfb;
+        const Key PA1 = 0xfd;
             
-            OemClear = 0xfe,
-
-   /*         Numpad0 = VK_KP_0,
-            Numpad1 = VK_KP_1,
-            Numpad2 = VK_KP_2,
-            Numpad3 = VK_KP_3,
-            Numpad4 = VK_KP_4,
-            Numpad5 = VK_KP_5,
-            Numpad6 = VK_KP_6,
-            Numpad7 = VK_KP_7,
-            Numpad8 = VK_KP_8,
-            Numpad9 = VK_KP_9,
-            NumpadDivide = VK_KP_DIVIDE,
-            NumpadMultiply = VK_KP_MULTIPLY,
-            NumpadSubstract = VK_KP_SUBTRACT,
-            NumpadAdd = VK_KP_ADD,
-            NumpadEnter = VK_KP_ENTER,
-            NumpadDecimal = VK_KP_DECIMAL,
-            NumpadEqualSign = VK_KP_EQUAL,
-            Space = VK_SPACE,
-            Tab = VK_TAB,
-            Up = VK_UP,
-            Left = VK_LEFT,
-            Down = VK_DOWN,
-            Right = VK_RIGHT,
-            ControlLeft = VK_LEFT_CONTROL,
-            ControlRight = VK_RIGHT_CONTROL,
-            ShiftLeft = VK_LEFT_SHIFT,
-            ShiftRight = VK_RIGHT_SHIFT,
-            AltLeft = VK_LEFT_ALT,
-            AltRight = VK_RIGHT_ALT,
-            SuperLeft = VK_LEFT_SUPER,
-            SuperRight = VK_RIGHT_SUPER,
-            CapsLock = VK_CAPS_LOCK,
-            Escape = VK_ESCAPE,
-            Backspace = VK_BACKSPACE,
-            Enter = VK_ENTER,
-            Comma = VK_COMMA,
-            Period = VK_PERIOD,
-            LessThan = VK_WORLD_1,
-            Menu = VK_MENU,
-            ScrollLock = VK_SCROLL_LOCK,
-            Pause = VK_PAUSE,
-            Insert = VK_INSERT,
-            Delete = VK_DELETE,
-            End = VK_END,
-            PageUp = VK_PAGE_UP,
-            PageDown = VK_PAGE_DOWN,
-            NumLock = VK_NUM_LOCK,
-            Print = VK_PRINT_SCREEN,
-
-            Qwerty_Apostrophe = VK_APOSTROPHE,
-            Qwerty_Semicolon = VK_SEMICOLON,
-            Qwerty_BracketLeft = VK_LEFT_BRACKET,
-            Qwerty_BracketRight = VK_RIGHT_BRACKET,
-            Qwerty_Backslash = VK_BACKSLASH,
-            Qwerty_Minus = VK_MINUS,
-            Qwerty_EqualSign = VK_EQUAL,
-            Qwerty_AccentLeft = VK_GRAVE_ACCENT,
-            Qwerty_Slash = VK_SLASH,
-            Qwerty_Home = VK_HOME,
-
-            Qwertz_AE = VK_APOSTROPHE,
-            Qwertz_OE = VK_SEMICOLON,
-            Qwertz_UE = VK_LEFT_BRACKET,
-            Qwertz_Plus = VK_RIGHT_BRACKET,
-            Qwertz_Hashtag = VK_BACKSLASH,
-            Qwertz_Eszett = VK_MINUS,
-            Qwertz_AccentRight = VK_EQUAL,
-            Qwertz_Circumflex = VK_GRAVE_ACCENT,
-            Qwertz_Minus = VK_SLASH,
-            Qwertz_Pos1 = VK_HOME*/
-        };
+        const Key OemClear = 0xfe;
 
     }
 
+    const size_t HIGHEST_KEY = 0xfe;
+
+    std::ostream& operator<<(std::ostream& ostream, Key key);
 }

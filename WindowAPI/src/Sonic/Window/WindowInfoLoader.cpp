@@ -23,7 +23,16 @@ static WindowMode toWindowMode(const String& name)
 static void loadJson(WindowInfo* info, InputFileStream file)
 {
 	JSON json;
-	file >> json;
+
+	try
+	{
+		file >> json;
+	}
+	catch (nlohmann::detail::parse_error)
+	{
+		// TODO: Print error
+		return;
+	}
 
 	if (json.contains("initialName"))
 		info->initialName = json["initialName"].get<String>();

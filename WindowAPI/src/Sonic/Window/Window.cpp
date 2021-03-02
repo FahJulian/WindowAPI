@@ -1,12 +1,13 @@
 #include <iostream>
+#include "Sonic/Event/Events/WindowEvents.h"
+#include "Sonic/Event/Events/MouseEvents.h"
+#include "Sonic/Event/Events/KeyEvents.h"
+#include "Input/Keyboard.h"
 #include "Input/Mouse.h"
-#include "Input/Keys.h"
 #include "_WIN32Include.h"
 #include "Window.h"
 
 using namespace Sonic;
-
-extern bool s_Running;
 
 
 static HWND s_Win32Handle;
@@ -14,6 +15,9 @@ static uint64_t s_TimerOffset;
 static uint64_t s_TimerFrequency;
 
 static WindowInfo s_Info;
+
+const int DECORATION_HEIGHT = 40;
+const int DECORATION_WIDTH = 17;
 
 
 LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -23,7 +27,7 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
     case WM_CLOSE:  [[fallthrough]];
     case WM_QUIT:   [[fallthrough]];
     case WM_DESTROY:
-        s_Running = false;
+        SONIC_EVENT_FN(WindowClosedEvent());
         return 0;
 
     case WM_LBUTTONDOWN:
@@ -60,23 +64,33 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
         
     case WM_MOUSEMOVE:
     {
+        float beforeX = Mouse::s_X;
+        float beforeY = Mouse::s_Y;
+
         Mouse::s_X = (float)GET_X_LPARAM(lParam);
-        Mouse::s_Y = (float)GET_Y_LPARAM(lParam);
-        std::cout << "Mouse moved " << "(" << Mouse::s_X << ", " << Mouse::s_Y << ")" << std::endl;
+        Mouse::s_Y = s_Info.currentHeight - (float)GET_Y_LPARAM(lParam);
+
+        float deltaX = Mouse::s_X - beforeX;
+        float deltaY = Mouse::s_Y - beforeY;
+
+        for (MouseButton button = 0; button.code < Mouse::s_Buttons.size(); button.code++)
+            if (Mouse::s_Buttons[button])
+                SONIC_EVENT_FN(MouseDraggedEvent(button, Mouse::s_X, Mouse::s_Y, beforeX, beforeY, deltaX, deltaY));
+
+        SONIC_EVENT_FN(MouseMovedEvent(Mouse::s_X, Mouse::s_Y, beforeX, beforeY, deltaX, deltaY));
 
         return 0;
     }
 
     case WM_MOUSEWHEEL:
-        std::cout << "Mouse scrolled by " << GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA << " " << "(" << Mouse::s_X << ", " << Mouse::s_Y << ")" << std::endl;
+        SONIC_EVENT_FN(MouseScrolledEvent(Mouse::s_X, Mouse::s_Y, 0.0f, (float)GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA));
         return 0;
 
-    case WM_SYSKEYDOWN:
-        std::cout << "System ";
-        [[fallthrough]];
+    case WM_SYSKEYDOWN: [[fallthrough]];
     case WM_KEYDOWN:
     {
         Key key = *((Key*)&wParam);
+        wchar_t keyChar = 0;
 
         if (key == Keys::Control) // Win32 does weird things
         {
@@ -94,19 +108,27 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
                 }
             }
         }
-        else if (lParam & 1 << 24 && key == Keys::Alt)
+        else if (lParam & 1 << 24)
         {
-            key = Keys::RightAlt;
+            if (key == Keys::Alt)
+                key = Keys::RightAlt;
+            else if (key == Keys::Enter)
+                key = Keys::NumpadEnter;
         }
 
-        std::cout << "Key " << (int)key << " pressed" << std::endl;
+        if (MSG charMessage;
+            PeekMessage(&charMessage, NULL, WM_CHAR, WM_CHAR, PM_REMOVE))
+        {
+            keyChar = *((wchar_t*)&charMessage.wParam);
+        }
+
+        Keyboard::s_Keys[key] = true;
+        SONIC_EVENT_FN(KeyPressedEvent(key, keyChar));
 
         return 0;
     }
 
-    case WM_SYSKEYUP:
-        std::cout << "System ";
-        [[fallthrough]];
+    case WM_SYSKEYUP:   [[fallthrough]];
     case WM_KEYUP:
     {
         Key key = *((Key*)&wParam);
@@ -127,23 +149,27 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
                 }
             }
         }
-        else if (lParam & 1 << 24 && key == Keys::Alt)
+        else if (lParam & 1 << 24)
         {
-            key = Keys::RightAlt;
+            if (key == Keys::Alt)
+                key = Keys::RightAlt;
+            else if (key == Keys::Enter)
+                key = Keys::NumpadEnter;
         }
 
-        std::cout << "Key " << (int)key << " released" << std::endl;
+        Keyboard::s_Keys[key] = false;
+        SONIC_EVENT_FN(KeyReleasedEvent(key));
 
         return 0;
     }
 
     case WM_SIZE:
-        std::cout << "Window resized to " << "(" << LOWORD(lParam) << ", " << HIWORD(lParam) << ")" << std::endl;
+        SONIC_EVENT_FN(WindowResizedEvent((float)LOWORD(lParam), (float)HIWORD(lParam)));
         return 0;
 
-    case WM_MOVE:
-        std::cout << "Window moved to " << "(" << LOWORD(lParam) << ", " << HIWORD(lParam) << ")" << std::endl;
-        return 0;
+    //case WM_MOVE:
+    //    std::cout << "Window moved to " << "(" << LOWORD(lParam) << ", " << HIWORD(lParam) << ")" << std::endl;
+    //    return 0;
     }
 
     return DefWindowProc(handle, msg, wParam, lParam);
@@ -152,13 +178,13 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
 void Window::onMouseButtonPressed(MouseButton button)
 {
     Mouse::s_Buttons[button] = true;
-    std::cout << "Button " << (int)button << " pressed " << "(" << Mouse::s_X << ", " << Mouse::s_Y << ")" << std::endl;
+    SONIC_EVENT_FN(MouseButtonPressedEvent(button, Mouse::s_X, Mouse::s_Y));
 }
 
 void Window::onMouseButtonReleased(MouseButton button)
 {
     Mouse::s_Buttons[button] = false;
-    std::cout << "Button " << (int)button << " pressed " << "(" << Mouse::s_X << ", " << Mouse::s_Y << ")" << std::endl;
+    SONIC_EVENT_FN(MouseButtonReleasedEvent(button, Mouse::s_X, Mouse::s_Y));
 }
 
 bool Window::init(const WindowInfo& info)
@@ -193,7 +219,8 @@ bool Window::init(const WindowInfo& info)
         WS_OVERLAPPEDWINDOW,            // Window style
 
         // Size and position
-        CW_USEDEFAULT, CW_USEDEFAULT, info.initialWidth, info.initialHeight,
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        info.initialWidth + DECORATION_WIDTH, info.initialHeight + DECORATION_HEIGHT,
 
         NULL,                           // Parent window    
         NULL,                           // Menu

@@ -5,4 +5,4 @@ using namespace Sonic;
 
 float Mouse::s_X = 0.0f;
 float Mouse::s_Y = 0.0f;
-bool Mouse::s_Buttons[BUTTON_AMOUNT] = { false };
+std::array<bool, HIGHEST_BUTTON + 1> Mouse::s_Buttons;

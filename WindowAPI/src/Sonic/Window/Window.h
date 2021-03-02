@@ -1,8 +1,13 @@
 #pragma once
+#include <Sonic/Event/EventDispatcher.h>
 #include "Input/Mouse.h"
 #include "_WIN32Include.h"
 #include "WindowInfo.h"
 #include "WindowInfoLoader.h"
+
+#ifndef SONIC_EVENT_FN
+	#define SONIC_EVENT_FN(e) EventDispatcher::dispatch(e)
+#endif
 
 namespace Sonic {
 
