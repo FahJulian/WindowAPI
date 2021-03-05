@@ -1,25 +1,9 @@
 #pragma once
 #include <cstdint>
-#include <iostream>
 
 namespace Sonic {
 
-    struct Key
-    {
-        uint8_t code;
-
-        Key(uint8_t code)
-            : code(code)
-        {
-        }
-
-        inline bool operator==(Key other) const { return code == other.code; }
-        inline bool operator!=(Key other) const { return code != other.code; }
-
-        inline operator size_t() const { return (size_t)code; }
-        inline operator uint8_t() const { return (uint8_t)code; }
-        inline operator int() const { return (int)code; }
-    };
+    using Key = uint8_t;
 
     namespace Keys {
 
@@ -237,10 +221,7 @@ namespace Sonic {
         const Key PA1 = 0xfd;
             
         const Key OemClear = 0xfe;
-
     }
 
-    const size_t HIGHEST_KEY = 0xfe;
-
-    std::ostream& operator<<(std::ostream& ostream, Key key);
+    const Key HIGHEST_KEY = 0xfe;
 }

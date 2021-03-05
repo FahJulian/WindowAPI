@@ -5,5 +5,7 @@
   "saveSize": false,
   "initialMode": "Windowed",
   "saveMode": false,
-  "resizable": true
+  "resizable": true,
+  "closeButton": true,
+  "closeOnAltF4": true
 }

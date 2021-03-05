@@ -6,3 +6,4 @@
 
 #include <Windows.h>
 #include <windowsx.h>
+#include <Uxtheme.h>

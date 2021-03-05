@@ -8,24 +8,20 @@ namespace Sonic {
 	{
 		String fileNamePrefix;
 
-		String initialName = "Sonic Window";
-		bool saveName = true;
+		String title = "Sonic Window";
+		bool saveTitle = true;
 
-		int initialWidth = 848;
-		int initialHeight = 480;
+		int width = 848;
+		int height = 480;
 		bool saveSize = true;
 
-		WindowMode initialMode = WindowMode::Windowed;
+		WindowMode mode = WindowMode::Windowed;
 		bool saveMode = true;
 
 		bool resizable = false;
+		bool closeButton = true;
 
-		String currentName;
-
-		int currentWidth = 0;
-		int currentHeight = 0;
-
-		WindowMode currentMode = WindowMode::Windowed;
+		bool closeOnAltF4 = true;
 	};
 
 }

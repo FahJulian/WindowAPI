@@ -1,3 +1,4 @@
+#include <iostream>
 #include <Sonic/Event/EventDispatcher.h>
 #include "Sonic/Event/Events/KeyEvents.h"
 #include "Sonic/Event/Events/MouseEvents.h"
@@ -15,22 +16,42 @@ bool s_Running;
 void onMouseButtonPressed(const MouseButtonPressedEvent& e)
 {
 	if (e.button == MouseButtons::Left)
-		std::cout << "Mouse button " << e.button << " pressed at (" << e.x << ", " << e.y << ")" << std::endl;
+		std::cout << "Mouse button " << (int)e.button << " pressed at (" << e.x << ", " << e.y << ")" << std::endl;
 }
 
 void onMouseButtonReleased(const MouseButtonReleasedEvent& e)
 {
-	std::cout << "Mouse button " << e.button << " released at (" << e.x << ", " << e.y << ")" << std::endl;
+	std::cout << "Mouse button " << (int)e.button << " released at (" << e.x << ", " << e.y << ")" << std::endl;
 }
 
 void onKeyPressed(const KeyPressedEvent& e)
 {
-	std::cout << "Key " << e.key << " pressed (char: " << e.character << ")" << std::endl;
+	std::cout << "Key " << (int)e.key << " pressed (char: " << e.character << ")" << std::endl;
 }
 
 void onKeyReleased(const KeyReleasedEvent& e)
 {
-	std::cout << "Key " << e.key << " released" << std::endl;
+	std::cout << "Key " << (int)e.key << " released" << std::endl;
+
+	switch (e.key)
+	{
+	case Keys::F1:
+		Window::setSize(0, 0);
+		break;
+	case Keys::F2:
+		Window::setWindowMode(WindowMode::Windowed);
+		break;
+	case Keys::F3:
+		Window::setWindowMode(WindowMode::WindowedBorderless);
+		break;
+	case Keys::F4:
+		Window::setWindowMode(WindowMode::WindowedFullscreen);
+		break;
+	case Keys::F5:
+		Window::setWindowMode(WindowMode::Fullscreen);
+		break;
+
+	}
 }
 
 void onWindowResized(const WindowResizedEvent& e)
@@ -78,9 +99,18 @@ int main()
 	EventDispatcher::addListener<WindowClosedEvent>(onWindowClosed);
 	EventDispatcher::addListener<MouseDraggedEvent>(onMouseDragged);
 
+	Window::setClearColor(Colors::Cyan);
+
 	s_Running = true;
 	while (s_Running)
 	{
+		Window::clear();
+
+		Window::swapBuffers();
+
 		Window::pollEvents();
 	}
+
+	Window::saveInfo();
+	Window::destroy();
 }
