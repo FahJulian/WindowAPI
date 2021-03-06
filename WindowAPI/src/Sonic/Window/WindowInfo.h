@@ -1,9 +1,9 @@
 #pragma once
 #include "Sonic/Base.h"
-#include "Icon/Cursors.h"
-#include "WindowMode.h"
+#include "Sonic/Graphics/Color.h"
 #include "Icon/IconInfo.h"
 #include "Icon/CursorInfo.h"
+#include "WindowMode.h"
 
 namespace Sonic {
 	
@@ -14,6 +14,9 @@ namespace Sonic {
 
 		String title = "Sonic Window";
 		bool saveTitle = true;
+
+		Color clearColor = 0x333333ff;
+		bool saveClearColor = true;
 
 		int width = 848;
 		int height = 480;

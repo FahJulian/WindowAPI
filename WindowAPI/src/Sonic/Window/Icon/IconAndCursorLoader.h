@@ -5,7 +5,7 @@
 
 namespace Sonic {
 
-	const std::unordered_map<String, String> standardCursorSetFolderPaths = {
+	const std::unordered_map<String, String> standardCursorSetDirs = {
 		{
 			{ "Dark", coreResourceDir() + "cursors" + "/dark/" },
 			{ "DarkShadow", coreResourceDir() + "cursors" + "/dark_shadow/" },
@@ -18,14 +18,14 @@ namespace Sonic {
 	
 	namespace Util {
 
-		std::unordered_map<String, CursorInfo> loadCursors(InputFileStream& binaryFile);
+		std::unordered_map<String, CursorInfo> loadCursors(BinaryInputFileStream& binaryFile);
 		std::unordered_map<String, CursorInfo> loadCursors(const String& standardCursorSet, const std::unordered_map<String, String> filePaths);
 
-		std::vector<IconInfo> loadIcons(InputFileStream& binaryFile);
+		std::vector<IconInfo> loadIcons(BinaryInputFileStream& binaryFile);
 		std::vector<IconInfo> loadIcons(const std::vector<String>& filePaths);
 
-		void saveCursors(std::unordered_map<String, CursorInfo> cursors, OutputFileStream& file);
-		void saveIcons(std::vector<IconInfo> icons, OutputFileStream& file);
+		void saveCursors(std::unordered_map<String, CursorInfo>& cursors, BinaryOutputFileStream& file);
+		void saveIcons(std::vector<IconInfo>& icons, BinaryOutputFileStream& file);
 
 	}
 

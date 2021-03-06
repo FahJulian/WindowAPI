@@ -1,24 +1,31 @@
 {
-  "initialName": "Sandbox App",
+  "name": "Sandbox App",
   "saveName": true,
-  "initialSize": "600x400",
-  "saveSize": false,
-  "initialMode": "Windowed",
+
+  "size": "600x400",
+  "saveSize": true,
+
+  "mode": "Windowed",
   "saveMode": false,
+
+  "clearColor": "0x555555ff",
+
   "resizable": true,
   "closeButton": true,
   "closeOnAltF4": true,
 
+  "saveClearColor": false,
+
   "icons": [
-    "test.ico",
-    "testlarge.ico",
-    "testextralarge.ico"
+    "icons/test.png",
+    "icons/test2.png",
+    "icons/test3.png",
+    "icons/test4.ico",
+    "icons/test5.ico"
   ],
 
-  "standardCursorSet": "DarkShadow",
+  "standardCursorSet": "Dark",
   "cursors": {
-    "arrow": "arrow.png",
-    "largeHand": "largeHand.png",
-    "testCursor": "testCursor.png"
+    "arrow": "cursors/arrow.cur"
   }
 }

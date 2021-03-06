@@ -1,3 +1,5 @@
+#include <stb/stb_image.h>
+#include <filesystem>
 #include "Sonic/Log/Log.h"
 #include "Sonic/Window/Window.h"
 #include "Sonic/Util/StringUtils.h"
@@ -6,37 +8,56 @@
 using namespace Sonic;
 
 
-static const uint32_t CUR_HEADER_SIZE = 22;
+static const size_t CUR_HEADER_SIZE = 22;
 
 
 static std::vector<String> allStandardCursors = {
 	{
-		StandardCursors::Arrow,
-		StandardCursors::Arrow,
-		StandardCursors::Alternate,
-		StandardCursors::IBeam,
-		StandardCursors::Move,
-		StandardCursors::Crosshair,
-		StandardCursors::ResizeHorizontal,
-		StandardCursors::ResizeVertical,
-		StandardCursors::ResizeDiagonalLeft,
-		StandardCursors::ResizeDiagonalRight,
-		StandardCursors::Unavailable,
-		StandardCursors::Pen,
-		StandardCursors::Link,
-		StandardCursors::Help
+		Cursors::Arrow,
+		Cursors::Arrow,
+		Cursors::Alternate,
+		Cursors::IBeam,
+		Cursors::Move,
+		Cursors::Crosshair,
+		Cursors::ResizeHorizontal,
+		Cursors::ResizeVertical,
+		Cursors::ResizeDiagonalLeft,
+		Cursors::ResizeDiagonalRight,
+		Cursors::Unavailable,
+		Cursors::Pen,
+		Cursors::Link,
+		Cursors::Help
 	}
 };
 
-static CursorInfo loadCursorFromCur(InputFileStream&& file);
-static CursorInfo loadCursorFromPng(InputFileStream&& file);
-static IconInfo loadIconFromIco(InputFileStream&& file);
-static IconInfo loadIconFromPng(InputFileStream&& file);
+static CursorInfo loadCursorFromCur(BinaryInputFileStream&& file);
+static IconInfo loadIconFromIco(BinaryInputFileStream&& file);
+static IconInfo loadIconFromPng(const String& file);
 
 
-std::unordered_map<String, CursorInfo> Util::loadCursors(InputFileStream& binaryFile)
+std::unordered_map<String, CursorInfo> Util::loadCursors(BinaryInputFileStream& file)
 {
+	std::unordered_map<String, CursorInfo> cursors;
 
+	for (int i = 0, cursorAmount = file.read<uint16_t>(); i < cursorAmount; i++)
+	{
+		CursorInfo cursor;
+
+		uint16_t nameSize = file.read<uint16_t>();
+		const char* name = file.read<char>(nameSize);
+
+		cursor.width = file.read<uint16_t>();
+		cursor.height = file.read<uint16_t>();
+		cursor.hotspotX = file.read<uint16_t>();
+		cursor.hotspotY = file.read<uint16_t>();
+
+		cursor.bitmap = file.read<uint8_t>(4 * cursor.width * cursor.height);
+		
+		cursors.emplace(String(name, nameSize), cursor);
+		delete[] name;
+	}
+
+	return cursors;
 }
 
 std::unordered_map<String, CursorInfo> Util::loadCursors(const String& standardCursorSet, const std::unordered_map<String, String> filePaths)
@@ -46,26 +67,50 @@ std::unordered_map<String, CursorInfo> Util::loadCursors(const String& standardC
 	for (auto& [name, filePath] : filePaths)
 	{
 		if (Util::endsWith(filePath, ".cur"))
-			cursors.emplace(filePath, loadCursorFromCur(createBinaryInputFileStream(filePath)));
-		else if (Util::endsWith(filePath, ".png"))
-			cursors.emplace(filePath, loadCursorFromPng(InputFileStream(filePath)));
+		{
+			if (std::filesystem::exists(filePath))
+			{
+				cursors.emplace(name, loadCursorFromCur(filePath));
+			}
+			else if (String resourceDirFilePath = resourceDir() + filePath;
+				std::filesystem::exists(resourceDirFilePath))
+			{
+				cursors.emplace(name, loadCursorFromCur(resourceDirFilePath));
+			}
+		}
 	}
+
+	String standardCursorsDir = standardCursorSetDirs.find(standardCursorSet) != standardCursorSetDirs.end() ?
+		standardCursorSetDirs.at(standardCursorSet) : standardCursorSetDirs.at(defaultStandardCursorSet);
 
 	for (auto& standardCursor : allStandardCursors)
 	{
 		if (cursors.find(standardCursor) == cursors.end())
 		{
-			String filePath = standardCursorSetFolderPaths.at(standardCursorSet) + standardCursor + ".cur";
-			cursors.emplace(standardCursor, loadCursorFromCur(InputFileStream(filePath)));
+			String filePath = standardCursorsDir + standardCursor + ".cur";
+			cursors.emplace(standardCursor, loadCursorFromCur(filePath));
 		}
 	}
 
 	return cursors;
 }
 
-std::vector<IconInfo> Util::loadIcons(InputFileStream& binaryFile)
+std::vector<IconInfo> Util::loadIcons(BinaryInputFileStream& file)
 {
+	std::vector<IconInfo> icons;
 
+	for (int i = 0, iconAmount = file.read<uint16_t>(); i < iconAmount; i++)
+	{
+		IconInfo icon;
+
+		icon.width = file.read<uint16_t>();
+		icon.height = file.read<uint16_t>();
+		icon.bitmap = file.read<uint8_t>(4 * icon.width * icon.height);
+
+		icons.push_back(icon);
+	}
+
+	return icons;
 }
 
 std::vector<IconInfo> Util::loadIcons(const std::vector<String>& filePaths)
@@ -75,66 +120,109 @@ std::vector<IconInfo> Util::loadIcons(const std::vector<String>& filePaths)
 	for (auto& filePath : filePaths)
 	{
 		if (Util::endsWith(filePath, ".ico"))
-			icons.push_back(loadIconFromIco(createBinaryInputFileStream(filePath)));
+		{
+			if (std::filesystem::exists(filePath))
+			{
+				icons.push_back(loadIconFromIco(filePath));
+			}
+			else if (String resourceDirFilePath = resourceDir() + filePath;
+				std::filesystem::exists(resourceDirFilePath))
+			{
+				icons.push_back(loadIconFromIco(filePath));
+			}
+		}
 		else if (Util::endsWith(filePath, ".png"))
-			icons.push_back(loadIconFromPng(InputFileStream(filePath)));
+		{
+			if (std::filesystem::exists(filePath))
+			{
+				icons.push_back(loadIconFromPng(filePath));
+			}
+			else if (String resourceDirFilePath = resourceDir() + filePath;
+				std::filesystem::exists(resourceDirFilePath))
+			{
+				icons.push_back(loadIconFromPng(resourceDirFilePath));
+			}
+		}
 	}
 
 	return icons;
 }
 
-void Util::saveCursors(std::unordered_map<String, CursorInfo> cursors, OutputFileStream& file)
+void Util::saveCursors(std::unordered_map<String, CursorInfo>& cursors, BinaryOutputFileStream& file)
 {
+	file.write<uint16_t>((uint16_t)cursors.size());
 
+	for (auto& [cursorName, cursor] : cursors)
+	{
+		file.write<uint16_t>((uint16_t)cursorName.size());
+		file.write(cursorName.c_str(), cursorName.size());
+
+		file.write<uint16_t>(cursor.width);
+		file.write<uint16_t>(cursor.height);
+		file.write<uint16_t>(cursor.hotspotX);
+		file.write<uint16_t>(cursor.hotspotY);
+
+		file.write(cursor.bitmap, 4 * cursor.width * cursor.height);
+
+		delete[] cursor.bitmap;
+	}
+
+	cursors.clear();
 }
 
-void Util::saveIcons(std::vector<IconInfo> icons, OutputFileStream& file)
+void Util::saveIcons(std::vector<IconInfo>& icons, BinaryOutputFileStream& file)
 {
+	file.write<uint16_t>((uint16_t)icons.size());
 
+	for (auto& icon : icons)
+	{
+		file.write<uint16_t>(icon.width);
+		file.write<uint16_t>(icon.height);
+		file.write(icon.bitmap, 4 * icon.width * icon.height);
+
+		delete[] icon.bitmap;
+	}
+
+	icons.clear();
 }
 
-static CursorInfo loadCursorFromCur(InputFileStream&& file)
+static CursorInfo loadCursorFromCur(BinaryInputFileStream&& file)
 {
 	CursorInfo cursor;
 
-	file.seekg(4, std::ios::cur);
+	file.moveCursor(4);
 
-	uint16_t cursorAmount;
-	file.read((char*)&cursorAmount, sizeof(cursorAmount));
+	uint16_t cursorAmount = file.read<uint16_t>();
 	if (cursorAmount != 1)
+	{
 		SONIC_LOG_WARN("Cursor file contains multiple images. Loading the first one");
+	}
 
-	file.read((char*)cursor.width, sizeof(cursor.width));
-	file.read((char*)&cursor.height, sizeof(cursor.height));
+	cursor.width = file.read<uint8_t>();
+	cursor.height = file.read<uint8_t>();
 
-	file.seekg(2, std::ios::cur);
+	file.moveCursor(2);
 
-	file.read((char*)&cursor.hotspotX, sizeof(cursor.hotspotX));
-	file.read((char*)&cursor.hotspotY, sizeof(cursor.hotspotY));
+	cursor.hotspotX = file.read<uint16_t>();
+	cursor.hotspotY = file.read<uint16_t>();
 
-	file.seekg(4, std::ios::cur);
+	file.moveCursor(4);
 
-	uint32_t bmpOffset;
-	file.read((char*)&bmpOffset, sizeof(bmpOffset));
+	size_t bitmapOffset = (size_t)file.read<uint32_t>();
+	file.moveCursor(bitmapOffset - CUR_HEADER_SIZE + (size_t)14);
 
-	file.seekg(bmpOffset - CUR_HEADER_SIZE + 14, std::ios::cur);
-
-	uint16_t bitsPerPixel;
-	file.read((char*)&bitsPerPixel, sizeof(bitsPerPixel));
+	uint16_t bitsPerPixel = file.read<uint16_t>();
 	SONIC_LOG_DEBUG_ASSERT(bitsPerPixel == 32, "Error loading cursor bitmap: Bitmap does not use 32 bits per pixel");
 
-	file.seekg(4, std::ios::cur);
+	file.moveCursor(4);
 
-	uint32_t bitmapSize;
-	file.read((char*)&bitmapSize, sizeof(bitmapSize));
+	uint32_t bitmapSize = file.read<uint32_t>();
 
-	file.seekg(16, std::ios::cur);
+	file.moveCursor(16);
 
-	cursor.bitmap = new uint8_t[bitmapSize];
-	file.read((char*)cursor.bitmap, bitmapSize);
+	cursor.bitmap = file.read<uint8_t>(bitmapSize);
 
-	uint8_t* flippedBitmap = new unsigned char[4 * (size_t)cursor.width * (size_t)cursor.height];
-
+	uint8_t* flippedBitmap = new uint8_t[4 * (size_t)cursor.width * (size_t)cursor.height];
 	for (int y = 0; y < cursor.height; y++)
 	{
 		for (int x = 0; x < cursor.width; x++)
@@ -152,16 +240,17 @@ static CursorInfo loadCursorFromCur(InputFileStream&& file)
 	return cursor;
 }
 
-static CursorInfo loadCursorFromPng(InputFileStream&& file)
+static IconInfo loadIconFromIco(BinaryInputFileStream&& file)
 {
-
+	return { 0, 0, nullptr };
 }
 
-static IconInfo loadIconFromIco(InputFileStream&& file)
+static IconInfo loadIconFromPng(const String& file)
 {
-}
+	stbi_set_flip_vertically_on_load(true);
 
-static IconInfo loadIconFromPng(InputFileStream&& file)
-{
+	IconInfo icon;
+	icon.bitmap = stbi_load(file.c_str(), &icon.width, &icon.height, NULL, 4);
+	return icon;
 }
 

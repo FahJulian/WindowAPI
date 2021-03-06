@@ -13,21 +13,21 @@ struct HWND__;
 
 namespace Sonic {
 
-	namespace StandardCursors {
+	namespace Cursors {
 
-		const String Arrow = "Arrow";
-		const String Alternate = "Alternate";
-		const String IBeam = "IBeam";
-		const String Move = "Move";
-		const String Crosshair = "Crosshair";
-		const String ResizeHorizontal = "ResizeHorizontal";
-		const String ResizeVertical = "ResizeVertical";
-		const String ResizeDiagonalLeft = "ResizeDiagonalLeft";
-		const String ResizeDiagonalRight = "ResizeDiagonalRight";
-		const String Unavailable = "Unavailable";
-		const String Pen = "Pen";
-		const String Link = "Link";
-		const String Help = "Help";
+		const String Arrow = "arrow";
+		const String Alternate = "alternate";
+		const String IBeam = "ibeam";
+		const String Move = "move";
+		const String Crosshair = "crosshair";
+		const String ResizeHorizontal = "resize_horizontal";
+		const String ResizeVertical = "resize_vertical";
+		const String ResizeDiagonalLeft = "resize_diagonal_left";
+		const String ResizeDiagonalRight = "resize_diagonal_right";
+		const String Unavailable = "unavailable";
+		const String Pen = "pen";
+		const String Link = "link";
+		const String Help = "help";
 
 	}
 

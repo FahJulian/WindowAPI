@@ -30,6 +30,7 @@ static int s_UnmaximizedWidth;
 static int s_UnmaximizedHeight;
 static String s_Title;
 static WindowMode s_Mode;
+static Color s_ClearColor;
 static bool s_CloseOnAltF4 = true;
 
 static HWND s_Win32Handle;
@@ -105,6 +106,13 @@ bool Window::init(const WindowInfo& info)
 
     createContext();
 
+    setClearColor(s_ClearColor = s_Info.clearColor);
+
+    int largeIconWidth = GetSystemMetrics(SM_CXICON);
+    int largeIconHeight = GetSystemMetrics(SM_CYICON);
+    int smallIconWidth = GetSystemMetrics(SM_CXSMICON);
+    int smallIconHeight = GetSystemMetrics(SM_CYSMICON);
+
     return true;
 }
 
@@ -167,11 +175,6 @@ void Window::createContext()
 
     s_OpenglContext = wglCreateContext(s_DeviceContext);
     wglMakeCurrent(s_DeviceContext, s_OpenglContext);
-
-    int largeIconWidth = GetSystemMetrics(SM_CXICON);
-    int largeIconHeight = GetSystemMetrics(SM_CYICON);
-    int smallIconWidth = GetSystemMetrics(SM_CXSMICON);
-    int smallIconHeight = GetSystemMetrics(SM_CYSMICON);
 }
 
 void Window::pollEvents()
@@ -271,6 +274,7 @@ void Window::setWindowMode(WindowMode mode)
 
 void Window::setClearColor(const Color& color)
 {
+    s_ClearColor = color;
     glClearColor(color.r, color.g, color.b, color.a);
 }
 
@@ -303,6 +307,8 @@ void Window::saveInfo()
         s_Info.title = s_Title;
     if (s_Info.saveMode)
         s_Info.mode = s_Mode;
+    if (s_Info.saveClearColor)
+        s_Info.clearColor = s_ClearColor;
 
     Util::saveWindowInfo(s_Info);
 }

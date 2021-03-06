@@ -21,18 +21,6 @@ static WindowMode toWindowMode(const String& name)
 		return WindowMode::Windowed;
 }
 
-static Cursors::StandardCursorSet toStandardCursorSet(const String& name)
-{
-	if (name == "DarkShadow")
-		return Cursors::StandardCursorSet::DarkShadow;
-	else if (name == "White")
-		return Cursors::StandardCursorSet::White;
-	else if (name == "WhiteShadow")
-		return Cursors::StandardCursorSet::WhiteShadow;
-	else
-		return Cursors::StandardCursorSet::Dark;
-}
-
 static void loadJson(WindowInfo* info, InputFileStream file)
 {
 	JSON json;
@@ -47,12 +35,12 @@ static void loadJson(WindowInfo* info, InputFileStream file)
 		return;
 	}
 
-	if (json.contains("initialName"))
-		info->title = json["initialName"].get<String>();
+	if (json.contains("name"))
+		info->title = json["name"].get<String>();
 
-	if (json.contains("initialSize"))
+	if (json.contains("size"))
 	{
-		JSON size = json["initialSize"];
+		JSON size = json["size"];
 		if (size.is_array())
 		{
 			info->width = size[0].get<int>();
@@ -73,10 +61,43 @@ static void loadJson(WindowInfo* info, InputFileStream file)
 		}
 	}
 
-	if (json.contains("initialName"))
-		info->title = json["initialName"].get<String>();
-	if (json.contains("initialMode"))
-		info->mode = toWindowMode(json["initialMode"].get<String>());
+	if (json.contains("clearColor"))
+	{
+		JSON clearColor = json["clearColor"];
+		if (clearColor.is_string())
+		{
+			String clearColorString = clearColor.get<String>();
+			if (clearColorString.size() == 10)
+				info->clearColor = std::stoul(clearColorString, nullptr, 16);
+			else if (clearColorString.size() == 8)
+				info->clearColor = std::stoul(clearColorString, nullptr, 16) | 0x000000ff;
+		}
+		else if (clearColor.is_array())
+		{
+			info->clearColor.r = clearColor[0].is_number_float() ? clearColor[0].get<float>() : clearColor[0].get<int>() / 255.0f;
+			info->clearColor.g = clearColor[1].is_number_float() ? clearColor[1].get<float>() : clearColor[1].get<int>() / 255.0f;
+			info->clearColor.b = clearColor[2].is_number_float() ? clearColor[2].get<float>() : clearColor[2].get<int>() / 255.0f;
+
+			if (clearColor.size() > 3)
+				info->clearColor.a = clearColor[3].is_number_float() ? clearColor[3].get<float>() : clearColor[3].get<int>() / 255.0f;
+		}
+		else
+		{
+			if (clearColor.contains("r"))
+				info->clearColor.r = clearColor["r"].is_number_float() ? clearColor["r"].get<float>() : clearColor["r"].get<int>() / 255.0f;
+			if (clearColor.contains("g"))
+				info->clearColor.g = clearColor["g"].is_number_float() ? clearColor["g"].get<float>() : clearColor["g"].get<int>() / 255.0f;
+			if (clearColor.contains("b"))
+				info->clearColor.b = clearColor["b"].is_number_float() ? clearColor["b"].get<float>() : clearColor["b"].get<int>() / 255.0f;
+			if (clearColor.contains("a"))
+				info->clearColor.a = clearColor["a"].is_number_float() ? clearColor["a"].get<float>() : clearColor["a"].get<int>() / 255.0f;
+		}
+	}
+
+	if (json.contains("name"))
+		info->title = json["name"].get<String>();
+	if (json.contains("mode"))
+		info->mode = toWindowMode(json["mode"].get<String>());
 	if (json.contains("saveName"))
 		info->saveTitle = json["saveName"].get<bool>();
 	if (json.contains("saveSize"))
@@ -95,16 +116,10 @@ static void loadJson(WindowInfo* info, InputFileStream file)
 		for (JSON& iconFilePath : json["icons"])
 			if (iconFilePath.is_string())
 				iconFilePaths.push_back(iconFilePath.get<String>());
-	
-	String standardCursors;
+
+	String standardCursorSet = defaultStandardCursorSet;
 	if (json.contains("standardCursorSet") && json["standardCursorSet"].is_string())
-	{
 		String standardCursorSet = json["standardCursorSet"];
-		if (standardCursorSetFolderPaths.find(standardCursorSet) != standardCursorSetFolderPaths.end())
-			standardCursors = standardCursorSetFolderPaths.at(standardCursorSet);
-		else
-			standardCursors = defaultStandardCursorSet;
-	}
 
 	std::unordered_map<String, String> cursorFilePaths;
 	if (json.contains("cursors") && json["cursors"].is_object())
@@ -112,31 +127,31 @@ static void loadJson(WindowInfo* info, InputFileStream file)
 			if (cursorFilePath.is_string())
 				cursorFilePaths.emplace(cursorName, cursorFilePath.get<String>());
 
+	info->cursors = Util::loadCursors(standardCursorSet, cursorFilePaths);
 	info->icons = Util::loadIcons(iconFilePaths);
-	info->cursors = Util::loadCursors(standardCursors, cursorFilePaths);
 }
 
-static void loadBinary(WindowInfo* info, InputFileStream file)
+static void loadBinary(WindowInfo* info, BinaryInputFileStream&& file)
 {
-	uint16_t sizeOfName;
-	file.read((char*)&sizeOfName, sizeof(sizeOfName));
-	
-	char* name = new char[sizeOfName + 1] { 0 };
-	file.read(name, sizeOfName);
-	info->title = String(name);
-	delete name;
+	uint16_t nameSize = file.read<uint16_t>();
+	const char* name = file.read<char>(nameSize);
+	info->title = String(name, nameSize);
+	delete[] name;
 
-	file.read((char*)&info->width, 2);
-	file.read((char*)&info->height, 2);
+	info->width = file.read<uint16_t>();
+	info->height = file.read<uint16_t>();
 
-	file.read((char*)&info->mode, 1);
+	info->mode = file.read<WindowMode>();
 
-	file.read((char*)&info->saveTitle, 1);
-	file.read((char*)&info->saveSize, 1);
-	file.read((char*)&info->saveMode, 1);
-	file.read((char*)&info->resizable, 1);
-	file.read((char*)&info->closeButton, 1);
-	file.read((char*)&info->closeOnAltF4, 1);
+	info->clearColor = file.read<uint32_t>();
+
+	info->saveTitle = file.read<bool>();
+	info->saveSize = file.read<bool>();
+	info->saveMode = file.read<bool>();
+	info->saveClearColor = file.read<bool>();
+	info->resizable = file.read<bool>();
+	info->closeButton = file.read<bool>();
+	info->closeOnAltF4 = file.read<bool>();
 
 	info->cursors = Util::loadCursors(file);
 	info->icons = Util::loadIcons(file);
@@ -147,28 +162,40 @@ WindowInfo Util::loadWindowInfo(String filePath, bool overrideBinary)
 {
 	WindowInfo info;
 
-	std::replace(filePath.begin(), filePath.end(), '/', '\\');
-
 	size_t i_fileEnding = filePath.find('.');
 	info.fileNamePrefix = i_fileEnding != String::npos ? filePath.substr(0, i_fileEnding) : filePath;
 
-	if (!std::filesystem::exists(info.fileNamePrefix + ".sonicwindow") || overrideBinary)
-	{
-		info.isLoadedFromJson = true;
-		loadJson(&info, InputFileStream(info.fileNamePrefix + ".sonicwindow.json", std::ios::in | std::ios::binary));
-	}
-	else
+	if (!overrideBinary && std::filesystem::exists(info.fileNamePrefix + ".sonicwindow"))
 	{
 		info.isLoadedFromJson = false;
-		loadBinary(&info, InputFileStream(info.fileNamePrefix + ".sonicwindow"));
+		loadBinary(&info, BinaryInputFileStream(info.fileNamePrefix + ".sonicwindow"));
+	}
+	else if (String resourceDirFilePath = resourceDir() + info.fileNamePrefix;
+		!overrideBinary && std::filesystem::exists(resourceDirFilePath + ".sonicwindow"))
+	{
+		info.isLoadedFromJson = false;
+		info.fileNamePrefix = resourceDirFilePath;
+		loadBinary(&info, BinaryInputFileStream(info.fileNamePrefix + ".sonicwindow"));
+	}
+	else if (std::filesystem::exists(info.fileNamePrefix + ".sonicwindow.json"))
+	{
+		info.isLoadedFromJson = true;
+		loadJson(&info, InputFileStream(info.fileNamePrefix + ".sonicwindow.json"));
+	}
+	else if (String resourceDirFilePath = resourceDir() + info.fileNamePrefix;
+		std::filesystem::exists(resourceDirFilePath + ".sonicwindow.json"))
+	{
+		info.isLoadedFromJson = true;
+		info.fileNamePrefix = resourceDirFilePath;
+		loadJson(&info, InputFileStream(info.fileNamePrefix + ".sonicwindow.json"));
 	}
 
 	return info;
 }
 
-bool Util::saveWindowInfo(const WindowInfo& info)
+bool Util::saveWindowInfo(WindowInfo& info)
 {
-	OutputFileStream file = OutputFileStream(info.fileNamePrefix + ".sonicwindow", std::ios::out | std::ios::binary);
+	BinaryOutputFileStream file = BinaryOutputFileStream(info.fileNamePrefix + ".sonicwindow");
 
 	uint16_t sizeOfName = (uint16_t)(info.title.size());
 	file.write((const char*)&sizeOfName, sizeof(sizeOfName));
@@ -182,23 +209,25 @@ bool Util::saveWindowInfo(const WindowInfo& info)
 
 	file.write((const char*)&info.mode, sizeof(WindowMode));
 
+	file.write<uint8_t>((uint8_t)(info.clearColor.a * 255.0f));
+	file.write<uint8_t>((uint8_t)(info.clearColor.b * 255.0f));
+	file.write<uint8_t>((uint8_t)(info.clearColor.g * 255.0f));
+	file.write<uint8_t>((uint8_t)(info.clearColor.r * 255.0f));
+
 	file.write((const char*)&info.saveTitle, sizeof(info.saveTitle));
 	file.write((const char*)&info.saveSize, sizeof(info.saveSize));
 	file.write((const char*)&info.saveMode, sizeof(info.saveMode));
+	file.write((const char*)&info.saveClearColor, sizeof(info.saveClearColor));
 
 	file.write((const char*)&info.resizable, sizeof(info.resizable));
 	file.write((const char*)&info.closeButton, sizeof(info.closeButton));
 
 	file.write((const char*)&info.closeOnAltF4, sizeof(info.closeOnAltF4));
 
-	if (info.isLoadedFromJson)
-	{
-		saveCursors(info.cursors, file);
-		saveIcons(info.icons, file);
-	}
+	saveCursors(info.cursors, file);
+	saveIcons(info.icons, file);
 
-	file.close();
-	return file.good();
+	return file.save();
 }
 
 /*
@@ -208,10 +237,22 @@ bool Util::saveWindowInfo(const WindowInfo& info)
 * 2 bytes: initial width
 * 2 bytes: initial height
 * 1 byte: initial mode
+* 4 bytes: initial clear color
 * 1 byte: save name
 * 1 byte: save size
 * 1 byte: save mode
+* 1 byte: save clear color
 * 1 byte: resizable
 * 1 byte: closeButton
 * 1 byte: closeOnAltF4
+* 2 bytes: amount of cursors
+* 2 bytes: cursor width		\
+* 2 bytes: cursor height	 \
+* 2 bytes: cursor hotpotX	  > ? times
+* 2 bytes: cursor hotspotY   /
+* ? bytes: cursor bitmap	/
+* 2 bytes: amount of icons
+* 2 bytes: icon width		\
+* 2 bytes: icon height		 > ? times
+* ? bytes: icon bitmap		/
 */

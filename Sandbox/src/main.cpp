@@ -1,5 +1,6 @@
 #include <iostream>
 #include <Sonic/Event/EventDispatcher.h>
+#include "Sonic/Base.h"
 #include "Sonic/Util/StringUtils.h"
 #include "Sonic/Event/Events/KeyEvents.h"
 #include "Sonic/Event/Events/MouseEvents.h"
@@ -13,6 +14,12 @@ using namespace Sonic;
 
 bool s_Running;
 
+
+const String& Sonic::resourceDir()
+{
+	static const String resourceDir = "C:/dev/WindowAPI/Sandbox/res/";
+	return resourceDir;
+}
 
 void onMouseButtonPressed(const MouseButtonPressedEvent& e)
 {
@@ -114,7 +121,7 @@ void onWindowLostFocus(const WindowLostFocusEvent& e)
 
 int main()
 {
-	Window::init("C:/dev/WindowAPI/Sandbox/res/app/sandboxapp.sonicwindow.json", true);
+	Window::init("app/sandboxapp");
 
 	EventDispatcher::addListener<MouseButtonPressedEvent>(onMouseButtonPressed);
 	EventDispatcher::addListener<MouseButtonReleasedEvent>(onMouseButtonReleased);
@@ -127,8 +134,6 @@ int main()
 	EventDispatcher::addListener<MouseDraggedEvent>(onMouseDragged);
 	EventDispatcher::addListener<WindowGainedFocusEvent>(onWindowGainedFocus);
 	EventDispatcher::addListener<WindowLostFocusEvent>(onWindowLostFocus);
-
-	Window::setClearColor(Colors::Cyan);
 
 	s_Running = true;
 	while (s_Running)

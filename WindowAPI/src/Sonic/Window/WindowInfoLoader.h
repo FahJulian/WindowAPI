@@ -5,6 +5,6 @@ namespace Sonic::Util {
 
 	WindowInfo loadWindowInfo(String filePath, bool overrideBinary = false);
 
-	bool saveWindowInfo(const WindowInfo& info);
+	bool saveWindowInfo(WindowInfo& info);
 
 }
