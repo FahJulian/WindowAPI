@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <json/json.hpp>
+#include "Icon/IconAndCursorLoader.h"
 #include "WindowInfoLoader.h"
 
 #include <iostream>
@@ -18,6 +19,18 @@ static WindowMode toWindowMode(const String& name)
 		return WindowMode::WindowedFullscreen;
 	else
 		return WindowMode::Windowed;
+}
+
+static Cursors::StandardCursorSet toStandardCursorSet(const String& name)
+{
+	if (name == "DarkShadow")
+		return Cursors::StandardCursorSet::DarkShadow;
+	else if (name == "White")
+		return Cursors::StandardCursorSet::White;
+	else if (name == "WhiteShadow")
+		return Cursors::StandardCursorSet::WhiteShadow;
+	else
+		return Cursors::StandardCursorSet::Dark;
 }
 
 static void loadJson(WindowInfo* info, InputFileStream file)
@@ -76,6 +89,31 @@ static void loadJson(WindowInfo* info, InputFileStream file)
 		info->closeButton = json["closeButton"].get<bool>();
 	if (json.contains("closeOnAltF4"))
 		info->closeOnAltF4 = json["closeOnAltF4"].get<bool>();
+
+	std::vector<String> iconFilePaths;
+	if (json.contains("icons") && json["icons"].is_array())
+		for (JSON& iconFilePath : json["icons"])
+			if (iconFilePath.is_string())
+				iconFilePaths.push_back(iconFilePath.get<String>());
+	
+	String standardCursors;
+	if (json.contains("standardCursorSet") && json["standardCursorSet"].is_string())
+	{
+		String standardCursorSet = json["standardCursorSet"];
+		if (standardCursorSetFolderPaths.find(standardCursorSet) != standardCursorSetFolderPaths.end())
+			standardCursors = standardCursorSetFolderPaths.at(standardCursorSet);
+		else
+			standardCursors = defaultStandardCursorSet;
+	}
+
+	std::unordered_map<String, String> cursorFilePaths;
+	if (json.contains("cursors") && json["cursors"].is_object())
+		for (auto& [cursorName, cursorFilePath] : json["cursors"].items())
+			if (cursorFilePath.is_string())
+				cursorFilePaths.emplace(cursorName, cursorFilePath.get<String>());
+
+	info->icons = Util::loadIcons(iconFilePaths);
+	info->cursors = Util::loadCursors(standardCursors, cursorFilePaths);
 }
 
 static void loadBinary(WindowInfo* info, InputFileStream file)
@@ -99,6 +137,9 @@ static void loadBinary(WindowInfo* info, InputFileStream file)
 	file.read((char*)&info->resizable, 1);
 	file.read((char*)&info->closeButton, 1);
 	file.read((char*)&info->closeOnAltF4, 1);
+
+	info->cursors = Util::loadCursors(file);
+	info->icons = Util::loadIcons(file);
 }
 
 
@@ -113,10 +154,12 @@ WindowInfo Util::loadWindowInfo(String filePath, bool overrideBinary)
 
 	if (!std::filesystem::exists(info.fileNamePrefix + ".sonicwindow") || overrideBinary)
 	{
+		info.isLoadedFromJson = true;
 		loadJson(&info, InputFileStream(info.fileNamePrefix + ".sonicwindow.json", std::ios::in | std::ios::binary));
 	}
 	else
 	{
+		info.isLoadedFromJson = false;
 		loadBinary(&info, InputFileStream(info.fileNamePrefix + ".sonicwindow"));
 	}
 
@@ -147,6 +190,12 @@ bool Util::saveWindowInfo(const WindowInfo& info)
 	file.write((const char*)&info.closeButton, sizeof(info.closeButton));
 
 	file.write((const char*)&info.closeOnAltF4, sizeof(info.closeOnAltF4));
+
+	if (info.isLoadedFromJson)
+	{
+		saveCursors(info.cursors, file);
+		saveIcons(info.icons, file);
+	}
 
 	file.close();
 	return file.good();
