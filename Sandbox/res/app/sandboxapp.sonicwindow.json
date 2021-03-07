@@ -1,12 +1,12 @@
 {
-  "name": "Sandbox App",
-  "saveName": true,
+  "title": "Sandbox App",
+  "saveTitle": true,
 
   "size": "600x400",
   "saveSize": true,
 
-  "mode": "Windowed",
-  "saveMode": false,
+  "mode": "Fullscreen",
+  "saveMode": true,
 
   "clearColor": "0x555555ff",
 
@@ -14,7 +14,13 @@
   "closeButton": true,
   "closeOnAltF4": true,
 
-  "saveClearColor": false,
+  "saveClearColor": true,
+
+  "minimized": true,
+  "saveMinimized": false,
+
+  "maximized": false,
+  "saveMaximized": true,
 
   "icons": [
     "icons/test.png",

@@ -45,9 +45,6 @@ void onKeyReleased(const KeyReleasedEvent& e)
 
 	switch (e.key)
 	{
-	case Keys::F1:
-		Window::setSize(0, 0);
-		break;
 	case Keys::F2:
 		Window::setWindowMode(WindowMode::Windowed);
 		break;
@@ -74,6 +71,18 @@ void onKeyReleased(const KeyReleasedEvent& e)
 		break;
 	case Keys::F10:
 		Window::setHeight(Window::getHeight() - 20);
+		break;
+	case Keys::ArrowUp:
+		Window::setMinimized(true);
+		break;
+	case Keys::ArrowDown:
+		Window::setMinimized(false);
+		break;
+	case Keys::ArrowLeft:
+		Window::setMaximized(true);
+		break;
+	case Keys::ArrowRight:
+		Window::setMaximized(false);
 		break;
 	}
 }

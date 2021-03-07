@@ -37,10 +37,16 @@ static HWND s_Win32Handle;
 static uint64_t s_TimerOffset;
 static uint64_t s_TimerFrequency;
 
-static DWORD s_Style;
-static DWORD s_ExStyle;
+static DWORD s_WindowedStyle;
+static DWORD s_WindowedExStyle;
 
-static bool s_StyleChanged = false;
+static int s_MonitorWidth;
+static int s_MonitorHeight;
+
+static bool s_Maximized;
+static bool s_Minimized;
+
+static bool s_IgnoreSizeMessage = false;
 
 static HDC s_DeviceContext;
 static HGLRC s_OpenglContext;
@@ -48,8 +54,7 @@ static HGLRC s_OpenglContext;
 
 static void initCursors();
 static void initIcons();
-static WindowDimensions getWindowDimensions();
-static void resize();
+static void adjustSize(int width, int height);
 static void setFullscreen(bool fullscreen);
 static Key getKey(LPARAM lParam, WPARAM wParam);
 
@@ -77,8 +82,6 @@ bool Window::init(const WindowInfo& info)
 
     RegisterClassEx(&win32WindowClass);
 
-    WindowDimensions windowDimensions = getWindowDimensions();
-
     s_Win32Handle = CreateWindowEx(0, className, Util::toWideString(s_Title).c_str(), 0, 
         0, 0, 0, 0, NULL, NULL, win32ModuleHandle, NULL
     );
@@ -90,16 +93,61 @@ bool Window::init(const WindowInfo& info)
         return false;
     }
 
-    SetWindowLong(s_Win32Handle, GWL_STYLE, s_Style);
-    SetWindowLong(s_Win32Handle, GWL_EXSTYLE, s_ExStyle);
+    s_WindowedStyle = (WS_OVERLAPPED | WS_CAPTION);
+    s_WindowedExStyle = 0;
 
-    SetWindowPos(s_Win32Handle, HWND_TOP, windowDimensions.x, windowDimensions.y, 
-        windowDimensions.width, windowDimensions.height, 0);
+    if (s_Info.closeButton)
+        s_WindowedStyle |= WS_SYSMENU;
 
-    ShowWindow(s_Win32Handle, SW_SHOW);
+    if (s_Info.resizable)
+        s_WindowedStyle |= (WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME);
 
-    if (s_Mode == WindowMode::Fullscreen)
-        setFullscreen(true);
+    s_MonitorWidth = GetSystemMetrics(SM_CXSCREEN);
+    s_MonitorHeight = GetSystemMetrics(SM_CYSCREEN);
+
+    s_IgnoreSizeMessage = true;
+
+    setFullscreen(s_Mode == WindowMode::Fullscreen);
+
+    if (s_Mode == WindowMode::Windowed)
+    {
+        SetWindowLong(s_Win32Handle, GWL_STYLE, s_WindowedStyle);
+        SetWindowLong(s_Win32Handle, GWL_EXSTYLE, s_WindowedExStyle);
+    }
+    else
+    {
+        SetWindowLong(s_Win32Handle, GWL_STYLE, 0);
+        SetWindowLong(s_Win32Handle, GWL_EXSTYLE, 0);
+    }
+
+    s_IgnoreSizeMessage = false;
+
+    if (s_Mode == WindowMode::Windowed)
+    {
+        RECT newWindow = { (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2, 
+            (s_MonitorWidth + s_UnmaximizedWidth) / 2, (s_MonitorHeight + s_UnmaximizedHeight) / 2 };
+        AdjustWindowRectEx(&newWindow, s_WindowedStyle, FALSE, s_WindowedExStyle);
+
+        SetWindowPos(s_Win32Handle, HWND_TOP, newWindow.left, newWindow.top,
+            newWindow.right - newWindow.left, newWindow.bottom - newWindow.top, SWP_NOZORDER);
+
+        ShowWindow(s_Win32Handle, info.maximized ? SW_MAXIMIZE : info.minimized ? SW_MINIMIZE : SW_NORMAL);
+    }
+    else if (s_Mode == WindowMode::WindowedBorderless)
+    {
+        SetWindowPos(s_Win32Handle, HWND_TOP, (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2,
+            s_UnmaximizedWidth, s_UnmaximizedHeight, SWP_NOZORDER);
+
+        ShowWindow(s_Win32Handle, info.minimized ? SW_MINIMIZE : SW_SHOW);
+    }
+    else
+    {
+        SetWindowPos(s_Win32Handle, HWND_TOP, 0, 0, s_MonitorWidth, s_MonitorHeight, SWP_NOZORDER);
+        ShowWindow(s_Win32Handle, info.minimized ? SW_MINIMIZE : SW_SHOW);
+    }
+
+    s_Maximized = info.maximized;
+    s_Minimized = !s_Maximized && info.minimized;
 
     initCursors();
     initIcons();
@@ -187,12 +235,9 @@ void Window::pollEvents()
     }
 }
 
-void Window::onResized(int width, int height, bool minimized)
+void Window::onResized(int width, int height)
 {
-    if (s_StyleChanged)
-        return;
-
-    if (!minimized && (s_Mode == WindowMode::Windowed || s_Mode == WindowMode::WindowedBorderless))
+    if (s_Mode == WindowMode::Windowed && !s_Minimized && !s_Maximized)
     {
         s_UnmaximizedWidth = width;
         s_UnmaximizedHeight = height;
@@ -234,21 +279,84 @@ String Window::getTitle()
 
 void Window::setWidth(float width)
 {
-    s_UnmaximizedWidth = static_cast<int>(width);
-    resize();
+    adjustSize((int)(width + 0.5f), s_CurrentHeight);
 }
 
 void Window::setHeight(float height)
 {
-    s_UnmaximizedHeight = static_cast<int>(height);
-    resize();
+    adjustSize(s_CurrentWidth, (int)(height + 0.5f));
 }
 
 void Window::setSize(float width, float height)
 {
-    s_UnmaximizedWidth = static_cast<int>(width);
-    s_UnmaximizedHeight = static_cast<int>(height);
-    resize();
+    adjustSize((int)(width + 0.5f), int(height + 0.5f));
+}
+
+void Window::setMaximized(bool b)
+{
+    s_Maximized = b;
+
+    if (s_Mode != WindowMode::Windowed)
+        return;
+
+    if (b)
+    {
+        ShowWindow(s_Win32Handle, SW_MAXIMIZE);
+    }
+    else
+    {
+        s_IgnoreSizeMessage = true;
+        ShowWindow(s_Win32Handle, s_Minimized ? SW_MINIMIZE : SW_NORMAL);
+        s_IgnoreSizeMessage = false;
+
+        RECT newWindow = { (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2,
+            (s_MonitorWidth + s_UnmaximizedWidth) / 2, (s_MonitorHeight + s_UnmaximizedHeight) / 2 };
+        AdjustWindowRectEx(&newWindow, s_WindowedStyle, FALSE, s_WindowedExStyle);
+
+        SetWindowPos(s_Win32Handle, HWND_TOP, newWindow.left, newWindow.top,
+            newWindow.right - newWindow.left, newWindow.bottom - newWindow.top, SWP_NOZORDER | SWP_SHOWWINDOW);
+    }
+}
+
+void Window::setMinimized(bool b)
+{
+    s_Minimized = b;
+
+    if (b)
+    {
+        ShowWindow(s_Win32Handle, SW_MINIMIZE);
+    }
+    else if (s_Mode == WindowMode::Windowed)
+    {
+        RECT newWindow = { (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2,
+            (s_MonitorWidth + s_UnmaximizedWidth) / 2, (s_MonitorHeight + s_UnmaximizedHeight) / 2 };
+        AdjustWindowRectEx(&newWindow, s_WindowedStyle, FALSE, s_WindowedExStyle);
+
+        SetWindowPos(s_Win32Handle, HWND_TOP, newWindow.left, newWindow.top,
+            newWindow.right - newWindow.left, newWindow.bottom - newWindow.top, SWP_NOZORDER);
+
+        ShowWindow(s_Win32Handle, s_Maximized ? SW_MAXIMIZE : SW_NORMAL);
+    }
+    else if (s_Mode == WindowMode::WindowedBorderless)
+    {
+        SetWindowPos(s_Win32Handle, HWND_TOP, (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2,
+            s_UnmaximizedWidth, s_UnmaximizedHeight, SWP_NOZORDER);
+    }
+    else
+    {
+        SetWindowPos(s_Win32Handle, HWND_TOP, 0, 0, s_MonitorWidth, s_MonitorHeight, SWP_NOZORDER);
+    }
+}
+
+bool Window::isMaximized()
+{
+    return s_Maximized || s_Mode == WindowMode::WindowedFullscreen || s_Mode == WindowMode::Fullscreen ||
+        (s_Mode == WindowMode::WindowedBorderless && s_CurrentWidth == s_MonitorWidth && s_CurrentWidth == s_MonitorHeight);
+}
+
+bool Window::isMinimized()
+{
+    return s_Minimized;
 }
 
 float Window::getWidth()
@@ -261,15 +369,80 @@ float Window::getHeight()
     return static_cast<float>(s_CurrentHeight);
 }
 
+float Window::getMonitorWidth()
+{
+    return (float)s_MonitorWidth;
+}
+
+float Window::getMonitorHeight()
+{
+    return (float)s_MonitorHeight;
+}
+
 void Window::setWindowMode(WindowMode mode)
 {
-    if (mode != WindowMode::Fullscreen && s_Mode == WindowMode::Fullscreen)
-        setFullscreen(false);
-    else if (mode == WindowMode::Fullscreen)
+    if (mode == s_Mode)
+        return;
+
+    s_IgnoreSizeMessage = true;
+
+    if (mode == WindowMode::Fullscreen)
         setFullscreen(true);
+    else if (s_Mode == WindowMode::Fullscreen)
+        setFullscreen(false);
+
+    if (mode == WindowMode::Windowed)
+    {
+        SetWindowLong(s_Win32Handle, GWL_STYLE, s_WindowedStyle);
+        SetWindowLong(s_Win32Handle, GWL_EXSTYLE, s_WindowedExStyle);
+    }
+    else if (s_Mode == WindowMode::Windowed)
+    {
+        SetWindowLong(s_Win32Handle, GWL_STYLE, 0);
+        SetWindowLong(s_Win32Handle, GWL_EXSTYLE, 0);
+    }
+
+    s_IgnoreSizeMessage = false;
 
     s_Mode = mode;
-    resize();
+
+    if (s_Mode == WindowMode::Windowed)
+    {
+        if (s_Maximized)
+            ShowWindow(s_Win32Handle, SW_MAXIMIZE);
+        else if (s_Minimized)
+            ShowWindow(s_Win32Handle, SW_MINIMIZE);
+        else
+        {
+            RECT newWindow = { (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2,
+                (s_MonitorWidth + s_UnmaximizedWidth) / 2, (s_MonitorHeight + s_UnmaximizedHeight) / 2 };
+            AdjustWindowRectEx(&newWindow, s_WindowedStyle, FALSE, s_WindowedExStyle);
+
+            SetWindowPos(s_Win32Handle, HWND_TOP, newWindow.left, newWindow.top,
+                newWindow.right - newWindow.left, newWindow.bottom - newWindow.top, SWP_NOZORDER);
+
+            ShowWindow(s_Win32Handle, SW_NORMAL);
+        }
+    }
+    else if (s_Mode == WindowMode::WindowedBorderless)
+    {
+        if (s_Minimized)
+            ShowWindow(s_Win32Handle, SW_MINIMIZE);
+        else
+        {
+            SetWindowPos(s_Win32Handle, HWND_TOP, (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2,
+                s_UnmaximizedWidth, s_UnmaximizedHeight, SWP_NOZORDER | SWP_SHOWWINDOW);
+        }
+    }
+    else
+    {
+        if (s_Minimized)
+            ShowWindow(s_Win32Handle, SW_MINIMIZE);
+        else
+        {
+            SetWindowPos(s_Win32Handle, HWND_TOP, 0, 0, s_MonitorWidth, s_MonitorHeight, SWP_NOZORDER | SWP_SHOWWINDOW);
+        }
+    }
 }
 
 void Window::setClearColor(const Color& color)
@@ -309,6 +482,10 @@ void Window::saveInfo()
         s_Info.mode = s_Mode;
     if (s_Info.saveClearColor)
         s_Info.clearColor = s_ClearColor;
+    if (s_Info.saveMaximized)
+        s_Info.maximized = s_Maximized;
+    if (s_Info.saveMinimized)
+        s_Info.minimized = s_Minimized;
 
     Util::saveWindowInfo(s_Info);
 }
@@ -422,7 +599,14 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
     }
 
     case WM_SIZE:
-        onResized((int)LOWORD(lParam), (int)HIWORD(lParam), wParam == SIZE_MINIMIZED);
+        if (!s_IgnoreSizeMessage)
+        {
+            s_Minimized = wParam == SIZE_MINIMIZED;
+            if (s_Mode == WindowMode::Windowed)
+                s_Maximized = wParam == SIZE_MAXIMIZED;
+
+            onResized((int)LOWORD(lParam), (int)HIWORD(lParam));
+        }
         return 0;
 
     case WM_KILLFOCUS:
@@ -434,6 +618,9 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
         return 0;
 
     case WM_SETFOCUS:
+        Mouse::s_Buttons = { false };
+        Keyboard::s_Keys = { false };
+
         SONIC_EVENT_FN(WindowGainedFocusEvent());
         return 0;
     }
@@ -452,77 +639,25 @@ static void initIcons()
 
 }
 
-static WindowDimensions getWindowDimensions()
+static void adjustSize(int width, int height)
 {
-    int width, height;
-    int monitorWidth, monitorHeight;
-
-    monitorWidth = GetSystemMetrics(SM_CXSCREEN);
-    monitorHeight = GetSystemMetrics(SM_CYSCREEN);
-
-    if (s_Mode == WindowMode::Windowed || s_Mode == WindowMode::WindowedBorderless)
-    {
-        width = s_UnmaximizedWidth;
-        height = s_UnmaximizedHeight;
-    }
-    else
-    {
-        width = monitorWidth;
-        height = monitorHeight;
-    }
+    s_UnmaximizedWidth = (int)width;
+    s_UnmaximizedHeight = height;
 
     if (s_Mode == WindowMode::Windowed)
     {
-        s_Style = (WS_OVERLAPPED | WS_CAPTION);
+        RECT newWindow = { s_MonitorWidth - s_UnmaximizedWidth, s_MonitorHeight - s_UnmaximizedHeight, s_UnmaximizedWidth, s_UnmaximizedHeight };
+        AdjustWindowRectEx(&newWindow, s_WindowedStyle, FALSE, s_WindowedExStyle);
 
-        if (s_Info.closeButton)
-            s_Style |= WS_SYSMENU;
+        SetWindowPos(s_Win32Handle, HWND_TOP, newWindow.left, newWindow.top,
+            newWindow.right - newWindow.left, newWindow.bottom - newWindow.top, SWP_NOZORDER);
 
-        if (s_Info.resizable)
-            s_Style |= (WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME);
-
-        s_ExStyle = 0;
+        ShowWindow(s_Win32Handle, s_Maximized ? SW_MAXIMIZE : s_Minimized ? SW_MINIMIZE : SW_NORMAL);
     }
-    else
+    else if (s_Mode == WindowMode::WindowedBorderless)
     {
-        s_Style = 0;
-        s_ExStyle = 0;
-    }
-
-    RECT windowRect = {
-        (monitorWidth - width) / 2,
-        (monitorHeight - height) / 2,
-        (monitorWidth + width) / 2,
-        (monitorHeight + height) / 2,
-    };
-
-    AdjustWindowRectEx(&windowRect, s_Style, FALSE, s_ExStyle);
-
-    return {
-        windowRect.left,
-        windowRect.top,
-        windowRect.right - windowRect.left,
-        windowRect.bottom - windowRect.top
-    };
-}
-
-static void resize()
-{
-    WindowDimensions d = getWindowDimensions();
-
-    if (d.width == 0 || d.height == 0)
-    {
-        ShowWindow(s_Win32Handle, SW_MINIMIZE);
-    }
-    else
-    {
-        s_StyleChanged = true;
-        SetWindowLong(s_Win32Handle, GWL_STYLE, s_Style);
-        SetWindowLong(s_Win32Handle, GWL_EXSTYLE, s_ExStyle);
-        s_StyleChanged = false;
-
-        SetWindowPos(s_Win32Handle, HWND_TOP, d.x, d.y,
-            d.width, d.height, SWP_SHOWWINDOW);
+        SetWindowPos(s_Win32Handle, HWND_TOP, (s_MonitorWidth - width) / 2, (s_MonitorHeight - height) / 2,
+            width, height, SWP_NOZORDER);
     }
 }
 

@@ -30,6 +30,12 @@ namespace Sonic {
 
 		bool closeOnAltF4 = true;
 
+		bool minimized = false;
+		bool maximized = false;
+
+		bool saveMinimized = false;
+		bool saveMaximized = true;
+
 		std::vector<IconInfo> icons;
 		std::unordered_map<String, CursorInfo> cursors;
 	};

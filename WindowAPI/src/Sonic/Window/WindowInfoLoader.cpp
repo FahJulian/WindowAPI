@@ -36,9 +36,6 @@ static void loadJson(WindowInfo* info, InputFileStream file)
 		return;
 	}
 
-	if (json.contains("name"))
-		info->title = json["name"].get<String>();
-
 	if (json.contains("size"))
 	{
 		JSON size = json["size"];
@@ -99,8 +96,8 @@ static void loadJson(WindowInfo* info, InputFileStream file)
 		info->title = json["name"].get<String>();
 	if (json.contains("mode"))
 		info->mode = toWindowMode(json["mode"].get<String>());
-	if (json.contains("saveName"))
-		info->saveTitle = json["saveName"].get<bool>();
+	if (json.contains("saveTitle"))
+		info->saveTitle = json["saveTitle"].get<bool>();
 	if (json.contains("saveSize"))
 		info->saveSize = json["saveSize"].get<bool>();
 	if (json.contains("saveMode"))
@@ -111,6 +108,14 @@ static void loadJson(WindowInfo* info, InputFileStream file)
 		info->closeButton = json["closeButton"].get<bool>();
 	if (json.contains("closeOnAltF4"))
 		info->closeOnAltF4 = json["closeOnAltF4"].get<bool>();
+	if (json.contains("minimized"))
+		info->minimized = json["minimized"].get<bool>();
+	if (json.contains("maximized"))
+		info->maximized = json["maximized"].get<bool>();
+	if (json.contains("saveMinimized"))
+		info->saveMinimized = json["saveMinimized"].get<bool>();
+	if (json.contains("saveMaximized"))
+		info->saveMaximized = json["saveMaximized"].get<bool>();
 
 	std::vector<String> iconFilePaths;
 	if (json.contains("icons") && json["icons"].is_array())
@@ -153,6 +158,10 @@ static void loadBinary(WindowInfo* info, Util::BinaryInputFileStream&& file)
 	info->resizable = file.read<bool>();
 	info->closeButton = file.read<bool>();
 	info->closeOnAltF4 = file.read<bool>();
+	info->minimized = file.read<bool>();
+	info->maximized = file.read<bool>();
+	info->saveMinimized = file.read<bool>();
+	info->saveMaximized = file.read<bool>();
 
 	info->cursors = Util::loadCursors(file);
 	info->icons = Util::loadIcons(file);
@@ -224,6 +233,12 @@ bool Util::saveWindowInfo(WindowInfo& info)
 	file.write((const char*)&info.closeButton, sizeof(info.closeButton));
 
 	file.write((const char*)&info.closeOnAltF4, sizeof(info.closeOnAltF4));
+
+	file.write((const char*)&info.minimized, sizeof(info.minimized));
+	file.write((const char*)&info.maximized, sizeof(info.maximized));
+
+	file.write((const char*)&info.saveMinimized, sizeof(info.saveMinimized));
+	file.write((const char*)&info.saveMaximized, sizeof(info.saveMaximized));
 
 	saveCursors(info.cursors, file);
 	saveIcons(info.icons, file);

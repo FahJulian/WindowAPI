@@ -38,7 +38,7 @@ namespace Sonic {
 		Window(const Window& other) = delete;
 		Window& operator=(const Window& other) = delete;
 
-		static void onResized(int width, int height, bool minimized);
+		static void onResized(int width, int height);
 		static void onMouseButtonPressed(MouseButton button);
 		static void onMouseButtonReleased(MouseButton button);
 		static __int64 __stdcall WindowProc(HWND__* handle, unsigned int msg, unsigned __int64 wParam, __int64 lParam);
@@ -70,6 +70,15 @@ namespace Sonic {
 		static void setSize(float width, float height);
 		static float getWidth();
 		static float getHeight();
+
+		static void setMaximized(bool b);
+		static void setMinimized(bool b);
+
+		static bool isMinimized();
+		static bool isMaximized();
+
+		static float getMonitorWidth();
+		static float getMonitorHeight();
 
 		static void setWindowMode(WindowMode mode);
 
