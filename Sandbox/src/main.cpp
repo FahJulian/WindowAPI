@@ -84,6 +84,45 @@ void onKeyReleased(const KeyReleasedEvent& e)
 	case Keys::ArrowRight:
 		Window::setMaximized(false);
 		break;
+	case Keys::A:
+		Window::setCursor(Cursors::Arrow);
+		break;
+	case Keys::B:
+		Window::setCursor(Cursors::Alternate);
+		break;
+	case Keys::C:
+		Window::setCursor(Cursors::Crosshair);
+		break;
+	case Keys::D:
+		Window::setCursor(Cursors::Help);
+		break;
+	case Keys::E:
+		Window::setCursor(Cursors::IBeam);
+		break;
+	case Keys::F:
+		Window::setCursor(Cursors::Link);
+		break;
+	case Keys::G:
+		Window::setCursor(Cursors::Move);
+		break;
+	case Keys::H:
+		Window::setCursor(Cursors::Pen);
+		break;
+	case Keys::I:
+		Window::setCursor(Cursors::ResizeDiagonalLeft);
+		break;
+	case Keys::J:
+		Window::setCursor(Cursors::ResizeDiagonalRight);
+		break;
+	case Keys::K:
+		Window::setCursor(Cursors::ResizeHorizontal);
+		break;
+	case Keys::L:
+		Window::setCursor(Cursors::ResizeVertical);
+		break;
+	case Keys::M:
+		Window::setCursor(Cursors::Unavailable);
+		break;
 	}
 }
 

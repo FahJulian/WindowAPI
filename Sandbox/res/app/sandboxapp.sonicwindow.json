@@ -23,11 +23,6 @@
   "saveMaximized": true,
 
   "icons": [
-    "icons/test.png",
-    "icons/test2.png",
-    "icons/test3.png",
-    "icons/test4.ico",
-    "icons/test5.ico"
   ],
 
   "standardCursorSet": "Dark",

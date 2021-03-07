@@ -113,9 +113,12 @@ std::vector<IconInfo> Util::loadIcons(BinaryInputFileStream& file)
 	return icons;
 }
 
-std::vector<IconInfo> Util::loadIcons(const std::vector<String>& filePaths)
+std::vector<IconInfo> Util::loadIcons(std::vector<String>& filePaths)
 {
 	std::vector<IconInfo> icons;
+
+	if (filePaths.size() == 0)
+		filePaths = defaultIconFilePaths;
 
 	for (auto& filePath : filePaths)
 	{
@@ -297,10 +300,21 @@ static IconInfo loadIconFromIco(Util::BinaryInputFileStream&& file)
 
 static IconInfo loadIconFromPng(const String& file)
 {
-	stbi_set_flip_vertically_on_load(true);
-
 	IconInfo icon;
-	icon.bitmap = stbi_load(file.c_str(), &icon.width, &icon.height, NULL, 4);
+
+	uint8_t* tmpBitmap = stbi_load(file.c_str(), &icon.width, &icon.height, NULL, 4);
+
+	icon.bitmap = new uint8_t[4 * icon.width * icon.height];
+	for (int i = 0; i < icon.width * icon.height; i++)
+	{
+		icon.bitmap[4 * i + 0] = tmpBitmap[4 * i + 2];
+		icon.bitmap[4 * i + 1] = tmpBitmap[4 * i + 1];
+		icon.bitmap[4 * i + 2] = tmpBitmap[4 * i + 0];
+		icon.bitmap[4 * i + 3] = tmpBitmap[4 * i + 3];
+	}
+
+	delete[] tmpBitmap;
+
 	return icon;
 }
 

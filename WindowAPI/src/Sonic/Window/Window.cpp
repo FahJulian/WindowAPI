@@ -52,9 +52,18 @@ static bool s_IgnoreSizeMessage = false;
 static HDC s_DeviceContext;
 static HGLRC s_OpenglContext;
 
+static HICON smallIconHandle;
+static HICON largeIconHandle;
+
+static HCURSOR s_CurrentCursor;
+
+static std::unordered_map<String, HCURSOR> s_Cursors;
+
 
 static void initCursors();
 static void initIcons();
+static HICON createIcon(const IconInfo& icon);
+static HCURSOR createCursor(const CursorInfo& cursor);
 static void adjustSize(int width, int height);
 static void setFullscreen(bool fullscreen);
 static Key getKey(LPARAM lParam, WPARAM wParam);
@@ -150,6 +159,13 @@ bool Window::init(const WindowInfo& info)
     s_Maximized = info.maximized;
     s_Minimized = !s_Maximized && info.minimized;
 
+    s_DeviceContext = GetDC(s_Win32Handle);
+    if (s_DeviceContext == 0)
+    {
+        std::cout << "Error getting device context" << std::endl;
+        return false;
+    }
+
     initCursors();
     initIcons();
 
@@ -181,13 +197,6 @@ void Window::createContext()
         0,
         0, 0, 0
     };
-
-    s_DeviceContext = GetDC(s_Win32Handle);
-    if (s_DeviceContext == 0)
-    {
-        std::cout << "Error getting device context" << std::endl;
-        return;
-    }
 
     int pixelFormat = ChoosePixelFormat(s_DeviceContext, &pfd);
     if (pixelFormat == 0)
@@ -450,6 +459,31 @@ void Window::setClearColor(const Color& color)
     glClearColor(color.r, color.g, color.b, color.a);
 }
 
+void Window::setCursor(const String& name)
+{
+    RECT clientArea;
+    POINT cursorPos;
+
+    if (!GetCursorPos(&cursorPos))
+        return;
+
+    if (WindowFromPoint(cursorPos) != s_Win32Handle)
+        return;
+
+    GetClientRect(s_Win32Handle, &clientArea);
+    ClientToScreen(s_Win32Handle, (POINT*)&clientArea.left);
+    ClientToScreen(s_Win32Handle, (POINT*)&clientArea.right);
+
+    if (!PtInRect(&clientArea, cursorPos)) 
+        return;
+
+    if (auto it = s_Cursors.find(name);
+        it != s_Cursors.end())
+    {
+        SetCursor(s_CurrentCursor = it->second);
+    }
+}
+
 void Window::clear()
 {
     glClear(GL_COLOR_BUFFER_BIT);
@@ -496,6 +530,14 @@ void Window::destroy()
 
     if (s_Mode == WindowMode::Fullscreen)
         setFullscreen(false);
+
+    if (smallIconHandle)
+        DestroyIcon(smallIconHandle);
+    if (largeIconHandle)
+        DestroyIcon(largeIconHandle);
+
+    for (auto& [_, cursor] : s_Cursors)
+        DestroyCursor(cursor);
 
     DestroyWindow(s_Win32Handle);
 }
@@ -622,6 +664,17 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
 
         SONIC_EVENT_FN(WindowGainedFocusEvent());
         return 0;
+
+    case WM_SETCURSOR:
+        if (LOWORD(lParam) == HTCLIENT)
+        {
+            SetCursor(s_CurrentCursor);
+            return TRUE;
+        }
+        else
+        {
+            break;
+        }
     }
 
     return DefWindowProc(handle, msg, wParam, lParam);
@@ -630,7 +683,14 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
 
 static void initCursors()
 {
+    for (auto& [name, cursor] : s_Info.cursors)
+    {
+        if (HCURSOR handle = createCursor(cursor); 
+                handle)
+            s_Cursors.emplace(name, handle);
+    }
 
+    s_CurrentCursor = s_Cursors[Cursors::Arrow];
 }
 
 static void initIcons()
@@ -641,13 +701,13 @@ static void initIcons()
     int largeIconHeight = GetSystemMetrics(SM_CYICON);
 
     IconInfo smallIcon;
-    float smallestSizeDifference = 1.0e35;
+    double smallestSizeDifference = 1.0e35;
     for (auto& icon : s_Info.icons)
     {
         int xoff = smallIconWidth - icon.width;
         int yoff = smallIconHeight - icon.height;
 
-        float offset = sqrt(xoff * xoff + yoff * yoff);
+        double offset = sqrt(xoff * xoff + yoff * yoff);
         if (offset < smallestSizeDifference)
         {
             smallestSizeDifference = offset;
@@ -662,13 +722,135 @@ static void initIcons()
         int xoff = largeIconWidth - icon.width;
         int yoff = largeIconHeight - icon.height;
 
-        float offset = sqrt(xoff * xoff + yoff * yoff);
+        double offset = sqrt(xoff * xoff + yoff * yoff);
         if (offset < smallestSizeDifference)
         {
             smallestSizeDifference = offset;
             largeIcon = icon;
         }
     }
+
+    smallIconHandle = createIcon(smallIcon);
+    largeIconHandle = createIcon(largeIcon);
+
+    if (smallIconHandle)
+        SendMessage(s_Win32Handle, WM_SETICON, ICON_SMALL, (LPARAM)smallIconHandle);
+    if (largeIconHandle)
+        SendMessage(s_Win32Handle, WM_SETICON, ICON_BIG, (LPARAM)largeIconHandle);
+}
+
+HICON createIcon(const IconInfo& icon)
+{
+    if (!icon.bitmap)
+        return NULL;
+
+    HICON iconHandle;
+    HBITMAP color, mask;
+    BITMAPV5HEADER bi = {};
+    ICONINFO iconInfo = {};
+    uint8_t* bitmapSrc;
+
+    bi.bV5Size = sizeof(BITMAPV5HEADER);
+    bi.bV5Width = icon.width;
+    bi.bV5Height = -icon.height;
+    bi.bV5Planes = 1;
+    bi.bV5BitCount = 32;
+    bi.bV5Compression = BI_BITFIELDS;
+    bi.bV5RedMask = 0x00ff0000;
+    bi.bV5GreenMask = 0x0000ff00;
+    bi.bV5BlueMask = 0x000000ff;
+    bi.bV5AlphaMask = 0xff000000;
+
+    HDC dc = GetDC(NULL);
+    color = CreateDIBSection(dc, (BITMAPINFO*)&bi, DIB_RGB_COLORS,
+        (void**)&bitmapSrc, NULL, (DWORD)0);
+
+    mask = CreateBitmap(icon.width, icon.height, 1, 1, NULL);
+    ReleaseDC(NULL, dc);
+
+    if (!color || !mask)
+    {
+        std::cout << "Error: Could not create win32 bitmaps" << std::endl;
+        return NULL;
+    }
+
+    std::copy(icon.bitmap, icon.bitmap + 4 * icon.width * icon.height, bitmapSrc);
+
+    iconInfo.fIcon = TRUE;
+    iconInfo.xHotspot = 0;
+    iconInfo.yHotspot = 0;
+    iconInfo.hbmMask = mask;
+    iconInfo.hbmColor = color;
+
+    iconHandle = CreateIconIndirect(&iconInfo);
+
+    DeleteObject(color);
+    DeleteObject(mask);
+
+    if (!iconHandle)
+    {
+        std::cout << "Error: Could not create win32 icon" << std::endl;
+        return NULL;
+    }
+
+    return iconHandle;
+}
+
+static HCURSOR createCursor(const CursorInfo& cursor)
+{
+    if (!cursor.bitmap)
+        return NULL;
+
+    HICON cursorHandle;
+    HBITMAP color, mask;
+    BITMAPV5HEADER bi = {};
+    ICONINFO cursorInfo = {};
+    uint8_t* bitmapSrc;
+
+    bi.bV5Size = sizeof(BITMAPV5HEADER);
+    bi.bV5Width = cursor.width;
+    bi.bV5Height = -cursor.height;
+    bi.bV5Planes = 1;
+    bi.bV5BitCount = 32;
+    bi.bV5Compression = BI_BITFIELDS;
+    bi.bV5RedMask = 0x00ff0000;
+    bi.bV5GreenMask = 0x0000ff00;
+    bi.bV5BlueMask = 0x000000ff;
+    bi.bV5AlphaMask = 0xff000000;
+
+    HDC dc = GetDC(NULL);
+    color = CreateDIBSection(dc, (BITMAPINFO*)&bi, DIB_RGB_COLORS,
+        (void**)&bitmapSrc, NULL, (DWORD)0);
+
+    mask = CreateBitmap(cursor.width, cursor.height, 1, 1, NULL);
+    ReleaseDC(NULL, dc);
+
+    if (!color || !mask)
+    {
+        std::cout << "Error: Could not create win32 bitmaps" << std::endl;
+        return NULL;
+    }
+
+    std::copy(cursor.bitmap, cursor.bitmap + 4 * cursor.width * cursor.height, bitmapSrc);
+
+    cursorInfo.fIcon = FALSE;
+    cursorInfo.xHotspot = cursor.hotspotX;
+    cursorInfo.yHotspot = cursor.hotspotY;
+    cursorInfo.hbmMask = mask;
+    cursorInfo.hbmColor = color;
+
+    cursorHandle = CreateIconIndirect(&cursorInfo);
+
+    DeleteObject(color);
+    DeleteObject(mask);
+
+    if (!cursorHandle)
+    {
+        std::cout << "Error: Could not create win32 cursor" << std::endl;
+        return NULL;
+    }
+
+    return cursorHandle;
 }
 
 static void adjustSize(int width, int height)
