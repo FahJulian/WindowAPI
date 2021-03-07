@@ -1,5 +1,5 @@
-#include <stb/stb_image.h>
 #include <filesystem>
+#include <stb/stb_image.h>
 #include "Sonic/Log/Log.h"
 #include "Sonic/Window/Window.h"
 #include "Sonic/Util/StringUtils.h"
@@ -30,8 +30,8 @@ static std::vector<String> allStandardCursors = {
 	}
 };
 
-static CursorInfo loadCursorFromCur(BinaryInputFileStream&& file);
-static IconInfo loadIconFromIco(BinaryInputFileStream&& file);
+static CursorInfo loadCursorFromCur(Util::BinaryInputFileStream&& file);
+static IconInfo loadIconFromIco(Util::BinaryInputFileStream&& file);
 static IconInfo loadIconFromPng(const String& file);
 
 
@@ -51,7 +51,7 @@ std::unordered_map<String, CursorInfo> Util::loadCursors(BinaryInputFileStream& 
 		cursor.hotspotX = file.read<uint16_t>();
 		cursor.hotspotY = file.read<uint16_t>();
 
-		cursor.bitmap = file.read<uint8_t>(4 * cursor.width * cursor.height);
+		cursor.bitmap = file.readCompressed<uint8_t>(4 * cursor.width * cursor.height);
 		
 		cursors.emplace(String(name, nameSize), cursor);
 		delete[] name;
@@ -105,7 +105,7 @@ std::vector<IconInfo> Util::loadIcons(BinaryInputFileStream& file)
 
 		icon.width = file.read<uint16_t>();
 		icon.height = file.read<uint16_t>();
-		icon.bitmap = file.read<uint8_t>(4 * icon.width * icon.height);
+		icon.bitmap = file.readCompressed<uint8_t>(4 * icon.width * icon.height);
 
 		icons.push_back(icon);
 	}
@@ -162,7 +162,7 @@ void Util::saveCursors(std::unordered_map<String, CursorInfo>& cursors, BinaryOu
 		file.write<uint16_t>(cursor.hotspotX);
 		file.write<uint16_t>(cursor.hotspotY);
 
-		file.write(cursor.bitmap, 4 * cursor.width * cursor.height);
+		file.writeCompressed(cursor.bitmap, 4 * cursor.width * cursor.height);
 
 		delete[] cursor.bitmap;
 	}
@@ -178,7 +178,7 @@ void Util::saveIcons(std::vector<IconInfo>& icons, BinaryOutputFileStream& file)
 	{
 		file.write<uint16_t>(icon.width);
 		file.write<uint16_t>(icon.height);
-		file.write(icon.bitmap, 4 * icon.width * icon.height);
+		file.writeCompressed(icon.bitmap, 4 * icon.width * icon.height);
 
 		delete[] icon.bitmap;
 	}
@@ -186,7 +186,7 @@ void Util::saveIcons(std::vector<IconInfo>& icons, BinaryOutputFileStream& file)
 	icons.clear();
 }
 
-static CursorInfo loadCursorFromCur(BinaryInputFileStream&& file)
+static CursorInfo loadCursorFromCur(Util::BinaryInputFileStream&& file)
 {
 	CursorInfo cursor;
 
@@ -240,7 +240,7 @@ static CursorInfo loadCursorFromCur(BinaryInputFileStream&& file)
 	return cursor;
 }
 
-static IconInfo loadIconFromIco(BinaryInputFileStream&& file)
+static IconInfo loadIconFromIco(Util::BinaryInputFileStream&& file)
 {
 	return { 0, 0, nullptr };
 }

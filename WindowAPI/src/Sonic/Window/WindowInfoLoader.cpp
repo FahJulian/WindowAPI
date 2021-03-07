@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <json/json.hpp>
+#include "Sonic/Util/BinaryFileUtils.h"
 #include "Icon/IconAndCursorLoader.h"
 #include "WindowInfoLoader.h"
 
@@ -131,7 +132,7 @@ static void loadJson(WindowInfo* info, InputFileStream file)
 	info->icons = Util::loadIcons(iconFilePaths);
 }
 
-static void loadBinary(WindowInfo* info, BinaryInputFileStream&& file)
+static void loadBinary(WindowInfo* info, Util::BinaryInputFileStream&& file)
 {
 	uint16_t nameSize = file.read<uint16_t>();
 	const char* name = file.read<char>(nameSize);

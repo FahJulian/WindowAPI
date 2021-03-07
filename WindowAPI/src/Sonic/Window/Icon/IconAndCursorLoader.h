@@ -1,5 +1,5 @@
 #pragma once
-#include "Sonic/Base.h"
+#include "Sonic/Util/BinaryFileUtils.h"
 #include "IconInfo.h"
 #include "CursorInfo.h"
 
