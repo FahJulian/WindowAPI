@@ -1,3 +1,4 @@
+#include <limits>
 #include <iostream>
 #include <gl/glew.h>
 #include <gl/wglew.h>
@@ -156,11 +157,6 @@ bool Window::init(const WindowInfo& info)
 
     setClearColor(s_ClearColor = s_Info.clearColor);
 
-    int largeIconWidth = GetSystemMetrics(SM_CXICON);
-    int largeIconHeight = GetSystemMetrics(SM_CYICON);
-    int smallIconWidth = GetSystemMetrics(SM_CXSMICON);
-    int smallIconHeight = GetSystemMetrics(SM_CYSMICON);
-
     return true;
 }
 
@@ -187,8 +183,11 @@ void Window::createContext()
     };
 
     s_DeviceContext = GetDC(s_Win32Handle);
-    if (!s_DeviceContext)
+    if (s_DeviceContext == 0)
+    {
         std::cout << "Error getting device context" << std::endl;
+        return;
+    }
 
     int pixelFormat = ChoosePixelFormat(s_DeviceContext, &pfd);
     if (pixelFormat == 0)
@@ -636,7 +635,40 @@ static void initCursors()
 
 static void initIcons()
 {
+    int smallIconWidth = GetSystemMetrics(SM_CXSMICON);
+    int smallIconHeight = GetSystemMetrics(SM_CYSMICON);
+    int largeIconWidth = GetSystemMetrics(SM_CXICON);
+    int largeIconHeight = GetSystemMetrics(SM_CYICON);
 
+    IconInfo smallIcon;
+    float smallestSizeDifference = 1.0e35;
+    for (auto& icon : s_Info.icons)
+    {
+        int xoff = smallIconWidth - icon.width;
+        int yoff = smallIconHeight - icon.height;
+
+        float offset = sqrt(xoff * xoff + yoff * yoff);
+        if (offset < smallestSizeDifference)
+        {
+            smallestSizeDifference = offset;
+            smallIcon = icon;
+        }
+    }
+
+    IconInfo largeIcon;
+    smallestSizeDifference = 1.0e35;
+    for (auto& icon : s_Info.icons)
+    {
+        int xoff = largeIconWidth - icon.width;
+        int yoff = largeIconHeight - icon.height;
+
+        float offset = sqrt(xoff * xoff + yoff * yoff);
+        if (offset < smallestSizeDifference)
+        {
+            smallestSizeDifference = offset;
+            largeIcon = icon;
+        }
+    }
 }
 
 static void adjustSize(int width, int height)

@@ -8,7 +8,7 @@
 using namespace Sonic;
 
 
-static const size_t CUR_HEADER_SIZE = 22;
+static const size_t ICO_CUR_HEADER_SIZE = 22;
 
 
 static std::vector<String> allStandardCursors = {
@@ -128,7 +128,7 @@ std::vector<IconInfo> Util::loadIcons(const std::vector<String>& filePaths)
 			else if (String resourceDirFilePath = resourceDir() + filePath;
 				std::filesystem::exists(resourceDirFilePath))
 			{
-				icons.push_back(loadIconFromIco(filePath));
+				icons.push_back(loadIconFromIco(resourceDirFilePath));
 			}
 		}
 		else if (Util::endsWith(filePath, ".png"))
@@ -194,12 +194,15 @@ static CursorInfo loadCursorFromCur(Util::BinaryInputFileStream&& file)
 
 	uint16_t cursorAmount = file.read<uint16_t>();
 	if (cursorAmount != 1)
-	{
-		SONIC_LOG_WARN("Cursor file contains multiple images. Loading the first one");
-	}
+		SONIC_LOG_WARN("Cursor file contains multiple images. Loading only the first one");
 
 	cursor.width = file.read<uint8_t>();
 	cursor.height = file.read<uint8_t>();
+
+	if (cursor.width == 0)
+		cursor.width = 256;
+	if (cursor.height == 0)
+		cursor.height = 256;
 
 	file.moveCursor(2);
 
@@ -209,7 +212,7 @@ static CursorInfo loadCursorFromCur(Util::BinaryInputFileStream&& file)
 	file.moveCursor(4);
 
 	size_t bitmapOffset = (size_t)file.read<uint32_t>();
-	file.moveCursor(bitmapOffset - CUR_HEADER_SIZE + (size_t)14);
+	file.moveCursor(bitmapOffset - ICO_CUR_HEADER_SIZE + (size_t)14);
 
 	uint16_t bitsPerPixel = file.read<uint16_t>();
 	SONIC_LOG_DEBUG_ASSERT(bitsPerPixel == 32, "Error loading cursor bitmap: Bitmap does not use 32 bits per pixel");
@@ -242,7 +245,54 @@ static CursorInfo loadCursorFromCur(Util::BinaryInputFileStream&& file)
 
 static IconInfo loadIconFromIco(Util::BinaryInputFileStream&& file)
 {
-	return { 0, 0, nullptr };
+	IconInfo icon;
+
+	file.moveCursor(4);
+
+	uint16_t iconAmount = file.read<uint16_t>();
+	if (iconAmount != 1)
+		SONIC_LOG_WARN("Icon file contains multiple images. Loading only the first one");
+
+	icon.width = file.read<uint8_t>();
+	icon.height = file.read<uint8_t>();
+
+	if (icon.width == 0)
+		icon.width = 256;
+	if (icon.height == 0)
+		icon.height = 256;
+
+	file.moveCursor(10);
+
+	size_t bitmapOffset = (size_t)file.read<uint32_t>();
+	file.moveCursor(bitmapOffset - ICO_CUR_HEADER_SIZE + (size_t)14);
+
+	uint16_t bitsPerPixel = file.read<uint16_t>();
+	SONIC_LOG_DEBUG_ASSERT(bitsPerPixel == 32, "Error loading cursor bitmap: Bitmap does not use 32 bits per pixel");
+
+	file.moveCursor(4);
+
+	uint32_t bitmapSize = file.read<uint32_t>();
+
+	file.moveCursor(16);
+
+	icon.bitmap = file.read<uint8_t>(bitmapSize);
+
+	uint8_t* flippedBitmap = new uint8_t[4 * (size_t)icon.width * (size_t)icon.height];
+	for (int y = 0; y < icon.height; y++)
+	{
+		for (int x = 0; x < icon.width; x++)
+		{
+			uint32_t* pixel = reinterpret_cast<uint32_t*>(icon.bitmap + 4 * (x + y * (size_t)icon.width));
+			uint32_t* flippedPixel = reinterpret_cast<uint32_t*>(flippedBitmap + 4 * (x + ((size_t)icon.height - 1 - y) * (size_t)icon.width));
+
+			*flippedPixel = *pixel;
+		}
+	}
+
+	delete[] icon.bitmap;
+	icon.bitmap = flippedBitmap;
+
+	return icon;
 }
 
 static IconInfo loadIconFromPng(const String& file)

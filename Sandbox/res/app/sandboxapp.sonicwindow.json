@@ -5,7 +5,7 @@
   "size": "600x400",
   "saveSize": true,
 
-  "mode": "Fullscreen",
+  "mode": "Windowed",
   "saveMode": true,
 
   "clearColor": "0x555555ff",
@@ -16,7 +16,7 @@
 
   "saveClearColor": true,
 
-  "minimized": true,
+  "minimized": false,
   "saveMinimized": false,
 
   "maximized": false,
