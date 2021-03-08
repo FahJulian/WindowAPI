@@ -655,7 +655,7 @@ static HICON createNativeIcon(int width, int height, uint8_t* bitmap, int isCurs
 
     HICON handle;
     HBITMAP color, mask;
-    BITMAPV5HEADER bi = createBitmapHeader(width, -height);
+    BITMAPV5HEADER bi = createBitmapHeader(width, height);
     ICONINFO info = {};
     uint8_t* nativeBitmap;
 
@@ -674,7 +674,7 @@ static HICON createNativeIcon(int width, int height, uint8_t* bitmap, int isCurs
 
     std::copy(bitmap, bitmap + 4 * width * height, nativeBitmap);
 
-    info.fIcon = isCursor;
+    info.fIcon = !isCursor;
     info.xHotspot = hotspotX;
     info.yHotspot = hotspotY;
     info.hbmMask = mask;

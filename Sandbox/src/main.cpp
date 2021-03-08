@@ -160,7 +160,7 @@ void onWindowLostFocus(const WindowLostFocusEvent& e)
 
 int main()
 {
-	Window::init("windows/sandbox");
+	Window::init("windows/sandbox", true);
 
 	EventDispatcher::addListener<MouseButtonPressedEvent>(onMouseButtonPressed);
 	EventDispatcher::addListener<MouseButtonReleasedEvent>(onMouseButtonReleased);

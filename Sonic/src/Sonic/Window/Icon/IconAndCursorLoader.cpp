@@ -228,20 +228,20 @@ static CursorInfo loadCursorFromCur(Util::BinaryInputFileStream&& file)
 
 	cursor.bitmap = file.read<uint8_t>(bitmapSize);
 
-	uint8_t* flippedBitmap = new uint8_t[4 * (size_t)cursor.width * (size_t)cursor.height];
-	for (int y = 0; y < cursor.height; y++)
-	{
-		for (int x = 0; x < cursor.width; x++)
-		{
-			uint32_t* pixel = reinterpret_cast<uint32_t*>(cursor.bitmap + 4 * (x + y * (size_t)cursor.width));
-			uint32_t* flippedPixel = reinterpret_cast<uint32_t*>(flippedBitmap + 4 * (x + ((size_t)cursor.height - 1 - y) * (size_t)cursor.width));
+	//uint8_t* flippedBitmap = new uint8_t[4 * (size_t)cursor.width * (size_t)cursor.height];
+	//for (int y = 0; y < cursor.height; y++)
+	//{
+	//	for (int x = 0; x < cursor.width; x++)
+	//	{
+	//		uint32_t* pixel = reinterpret_cast<uint32_t*>(cursor.bitmap + 4 * (x + y * (size_t)cursor.width));
+	//		uint32_t* flippedPixel = reinterpret_cast<uint32_t*>(flippedBitmap + 4 * (x + ((size_t)cursor.height - 1 - y) * (size_t)cursor.width));
 
-			*flippedPixel = *pixel;
-		}
-	}
+	//		*flippedPixel = *pixel;
+	//	}
+	//}
 
-	delete[] cursor.bitmap;
-	cursor.bitmap = flippedBitmap;
+	//delete[] cursor.bitmap;
+	//cursor.bitmap = flippedBitmap;
 
 	return cursor;
 }
