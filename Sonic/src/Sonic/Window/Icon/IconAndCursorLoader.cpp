@@ -52,7 +52,7 @@ std::unordered_map<String, CursorInfo> Util::loadCursors(BinaryInputFileStream& 
 		cursor.hotspotY = file.read<uint16_t>();
 
 		cursor.bitmap = file.readCompressed<uint8_t>(4 * cursor.width * cursor.height);
-		
+
 		cursors.emplace(String(name, nameSize), cursor);
 		delete[] name;
 	}
@@ -228,21 +228,6 @@ static CursorInfo loadCursorFromCur(Util::BinaryInputFileStream&& file)
 
 	cursor.bitmap = file.read<uint8_t>(bitmapSize);
 
-	//uint8_t* flippedBitmap = new uint8_t[4 * (size_t)cursor.width * (size_t)cursor.height];
-	//for (int y = 0; y < cursor.height; y++)
-	//{
-	//	for (int x = 0; x < cursor.width; x++)
-	//	{
-	//		uint32_t* pixel = reinterpret_cast<uint32_t*>(cursor.bitmap + 4 * (x + y * (size_t)cursor.width));
-	//		uint32_t* flippedPixel = reinterpret_cast<uint32_t*>(flippedBitmap + 4 * (x + ((size_t)cursor.height - 1 - y) * (size_t)cursor.width));
-
-	//		*flippedPixel = *pixel;
-	//	}
-	//}
-
-	//delete[] cursor.bitmap;
-	//cursor.bitmap = flippedBitmap;
-
 	return cursor;
 }
 
@@ -280,26 +265,13 @@ static IconInfo loadIconFromIco(Util::BinaryInputFileStream&& file)
 
 	icon.bitmap = file.read<uint8_t>(bitmapSize);
 
-	uint8_t* flippedBitmap = new uint8_t[4 * (size_t)icon.width * (size_t)icon.height];
-	for (int y = 0; y < icon.height; y++)
-	{
-		for (int x = 0; x < icon.width; x++)
-		{
-			uint32_t* pixel = reinterpret_cast<uint32_t*>(icon.bitmap + 4 * (x + y * (size_t)icon.width));
-			uint32_t* flippedPixel = reinterpret_cast<uint32_t*>(flippedBitmap + 4 * (x + ((size_t)icon.height - 1 - y) * (size_t)icon.width));
-
-			*flippedPixel = *pixel;
-		}
-	}
-
-	delete[] icon.bitmap;
-	icon.bitmap = flippedBitmap;
-
 	return icon;
 }
 
 static IconInfo loadIconFromPng(const String& file)
 {
+	stbi_set_flip_vertically_on_load(1);
+
 	IconInfo icon;
 
 	uint8_t* tmpBitmap = stbi_load(file.c_str(), &icon.width, &icon.height, NULL, 4);
@@ -317,4 +289,3 @@ static IconInfo loadIconFromPng(const String& file)
 
 	return icon;
 }
-

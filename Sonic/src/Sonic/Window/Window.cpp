@@ -321,6 +321,11 @@ float Window::getMonitorHeight()
     return (float)s_MonitorHeight;
 }
 
+static WindowMode getWindowMode()
+{
+    return s_Mode;
+}
+
 void Window::setWindowMode(WindowMode mode)
 {
     if (mode == s_Mode)

@@ -76,6 +76,7 @@ namespace Sonic {
 		static float getMonitorHeight();
 
 		static void setWindowMode(WindowMode mode);
+		static WindowMode getWindowMode();
 
 		static double getTime();
 	};
