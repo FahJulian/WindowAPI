@@ -38,15 +38,14 @@ namespace Sonic {
 		Window(const Window& other) = delete;
 		Window& operator=(const Window& other) = delete;
 
+		static bool createWin32Window();
 		static void onResized(int width, int height);
 		static void onMouseButtonPressed(MouseButton button);
 		static void onMouseButtonReleased(MouseButton button);
 		static __int64 __stdcall WindowProc(HWND__* handle, unsigned int msg, unsigned __int64 wParam, __int64 lParam);
 
-		static void createContext();
+		static bool createContext();
 	public:
-		static Window* get();
-
 		static bool init(const WindowInfo& info);
 		static bool init(const String& infoFilePath, bool overrideBinary = false) { return init(Util::loadWindowInfo(infoFilePath, overrideBinary)); }
 

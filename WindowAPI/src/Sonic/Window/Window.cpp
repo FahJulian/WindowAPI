@@ -2,6 +2,7 @@
 #include <iostream>
 #include <gl/glew.h>
 #include <gl/wglew.h>
+#include "Sonic/Debug/Log/Log.h"
 #include "Sonic/Event/Events/WindowEvents.h"
 #include "Sonic/Event/Events/MouseEvents.h"
 #include "Sonic/Event/Events/KeyEvents.h"
@@ -60,12 +61,16 @@ static HCURSOR s_CurrentCursor;
 static std::unordered_map<String, HCURSOR> s_Cursors;
 
 
+static void initTimer();
 static void initCursors();
 static void initIcons();
-static HICON createIcon(const IconInfo& icon);
-static HCURSOR createCursor(const CursorInfo& cursor);
+static void initStyle();
+static HICON createNativeIcon(int width, int height, uint8_t* bitmap, int isCursor = FALSE, int hotspotX = 0, int hotspotY = 0);
+static BITMAPV5HEADER createBitmapHeader(int width, int height);
+static void setDecorated(bool decorated);
 static void adjustSize(int width, int height);
 static void setFullscreen(bool fullscreen);
+static void updateWindowSize();
 static Key getKey(LPARAM lParam, WPARAM wParam);
 
 
@@ -77,9 +82,37 @@ bool Window::init(const WindowInfo& info)
     s_Mode = s_Info.mode;
     s_Title = info.title;
 
-    QueryPerformanceFrequency((LARGE_INTEGER*)&s_TimerFrequency);
-    QueryPerformanceCounter((LARGE_INTEGER*)&s_TimerOffset);
+    if (!createWin32Window())
+        return false;
 
+    initTimer();
+
+    initStyle();
+
+    s_MonitorWidth = GetSystemMetrics(SM_CXSCREEN);
+    s_MonitorHeight = GetSystemMetrics(SM_CYSCREEN);
+
+    setFullscreen(s_Mode == WindowMode::Fullscreen);
+    setDecorated(s_Mode == WindowMode::Windowed);
+
+    s_Maximized = info.maximized;
+    s_Minimized = !s_Maximized && info.minimized;
+
+    updateWindowSize();
+
+    initCursors();
+    initIcons();
+
+    if (!createContext())
+        return false;
+
+    setClearColor(s_ClearColor = s_Info.clearColor);
+
+    return true;
+}
+
+bool Window::createWin32Window()
+{
     const wchar_t* className = L"Sample Window Class";
     HMODULE win32ModuleHandle = GetModuleHandle(0);
 
@@ -92,92 +125,30 @@ bool Window::init(const WindowInfo& info)
 
     RegisterClassEx(&win32WindowClass);
 
-    s_Win32Handle = CreateWindowEx(0, className, Util::toWideString(s_Title).c_str(), 0, 
+    s_Win32Handle = CreateWindowEx(0, className, Util::toWideString(s_Title).c_str(), 0,
         0, 0, 0, 0, NULL, NULL, win32ModuleHandle, NULL
     );
 
     if (s_Win32Handle == NULL)
     {
         DWORD error = GetLastError();
-        // TODO: Print error
+        SONIC_LOG_ERROR("Error creating win32 Window (Win32 Error code: ", error, ")");
         return false;
     }
-
-    s_WindowedStyle = (WS_OVERLAPPED | WS_CAPTION);
-    s_WindowedExStyle = 0;
-
-    if (s_Info.closeButton)
-        s_WindowedStyle |= WS_SYSMENU;
-
-    if (s_Info.resizable)
-        s_WindowedStyle |= (WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME);
-
-    s_MonitorWidth = GetSystemMetrics(SM_CXSCREEN);
-    s_MonitorHeight = GetSystemMetrics(SM_CYSCREEN);
-
-    s_IgnoreSizeMessage = true;
-
-    setFullscreen(s_Mode == WindowMode::Fullscreen);
-
-    if (s_Mode == WindowMode::Windowed)
-    {
-        SetWindowLong(s_Win32Handle, GWL_STYLE, s_WindowedStyle);
-        SetWindowLong(s_Win32Handle, GWL_EXSTYLE, s_WindowedExStyle);
-    }
-    else
-    {
-        SetWindowLong(s_Win32Handle, GWL_STYLE, 0);
-        SetWindowLong(s_Win32Handle, GWL_EXSTYLE, 0);
-    }
-
-    s_IgnoreSizeMessage = false;
-
-    if (s_Mode == WindowMode::Windowed)
-    {
-        RECT newWindow = { (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2, 
-            (s_MonitorWidth + s_UnmaximizedWidth) / 2, (s_MonitorHeight + s_UnmaximizedHeight) / 2 };
-        AdjustWindowRectEx(&newWindow, s_WindowedStyle, FALSE, s_WindowedExStyle);
-
-        SetWindowPos(s_Win32Handle, HWND_TOP, newWindow.left, newWindow.top,
-            newWindow.right - newWindow.left, newWindow.bottom - newWindow.top, SWP_NOZORDER);
-
-        ShowWindow(s_Win32Handle, info.maximized ? SW_MAXIMIZE : info.minimized ? SW_MINIMIZE : SW_NORMAL);
-    }
-    else if (s_Mode == WindowMode::WindowedBorderless)
-    {
-        SetWindowPos(s_Win32Handle, HWND_TOP, (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2,
-            s_UnmaximizedWidth, s_UnmaximizedHeight, SWP_NOZORDER);
-
-        ShowWindow(s_Win32Handle, info.minimized ? SW_MINIMIZE : SW_SHOW);
-    }
-    else
-    {
-        SetWindowPos(s_Win32Handle, HWND_TOP, 0, 0, s_MonitorWidth, s_MonitorHeight, SWP_NOZORDER);
-        ShowWindow(s_Win32Handle, info.minimized ? SW_MINIMIZE : SW_SHOW);
-    }
-
-    s_Maximized = info.maximized;
-    s_Minimized = !s_Maximized && info.minimized;
-
-    s_DeviceContext = GetDC(s_Win32Handle);
-    if (s_DeviceContext == 0)
-    {
-        std::cout << "Error getting device context" << std::endl;
-        return false;
-    }
-
-    initCursors();
-    initIcons();
-
-    createContext();
-
-    setClearColor(s_ClearColor = s_Info.clearColor);
 
     return true;
 }
 
-void Window::createContext()
+
+bool Window::createContext()
 {
+    s_DeviceContext = GetDC(s_Win32Handle);
+    if (s_DeviceContext == 0)
+    {
+        SONIC_LOG_ERROR("Error getting device context");
+        return false;
+    }
+
     PIXELFORMATDESCRIPTOR pfd =
     {
         sizeof(PIXELFORMATDESCRIPTOR),
@@ -200,7 +171,10 @@ void Window::createContext()
 
     int pixelFormat = ChoosePixelFormat(s_DeviceContext, &pfd);
     if (pixelFormat == 0)
-        std::cout << "Error creating pixel format" << std::endl;
+    {
+        SONIC_LOG_ERROR("Error creating pixel format");
+        return false;
+    }
 
     SetPixelFormat(s_DeviceContext, pixelFormat, &pfd);
 
@@ -220,17 +194,24 @@ void Window::createContext()
     };
 
     if (glewInit() != GLEW_OK)
-        std::cout << "Error initializing glew" << std::endl;
+    {
+        SONIC_LOG_ERROR("Error initializing glew");
+        return false;
+    }
 
     UINT numFormats;
-    BOOL success = wglChoosePixelFormatARB(s_DeviceContext, attribList, NULL, 1, &pixelFormat, &numFormats);
-    if (success == FALSE)
-        std::cout << "rror creating opengl context" << std::endl;
+    if (!wglChoosePixelFormatARB(s_DeviceContext, attribList, NULL, 1, &pixelFormat, &numFormats))
+    {
+        SONIC_LOG_ERROR("Error creating opengl context");
+        return false;
+    }
 
     SetPixelFormat(s_DeviceContext, pixelFormat, &pfd);
 
     s_OpenglContext = wglCreateContext(s_DeviceContext);
     wglMakeCurrent(s_DeviceContext, s_OpenglContext);
+
+    return true;
 }
 
 void Window::pollEvents()
@@ -304,56 +285,15 @@ void Window::setMaximized(bool b)
 {
     s_Maximized = b;
 
-    if (s_Mode != WindowMode::Windowed)
-        return;
-
-    if (b)
-    {
-        ShowWindow(s_Win32Handle, SW_MAXIMIZE);
-    }
-    else
-    {
-        s_IgnoreSizeMessage = true;
-        ShowWindow(s_Win32Handle, s_Minimized ? SW_MINIMIZE : SW_NORMAL);
-        s_IgnoreSizeMessage = false;
-
-        RECT newWindow = { (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2,
-            (s_MonitorWidth + s_UnmaximizedWidth) / 2, (s_MonitorHeight + s_UnmaximizedHeight) / 2 };
-        AdjustWindowRectEx(&newWindow, s_WindowedStyle, FALSE, s_WindowedExStyle);
-
-        SetWindowPos(s_Win32Handle, HWND_TOP, newWindow.left, newWindow.top,
-            newWindow.right - newWindow.left, newWindow.bottom - newWindow.top, SWP_NOZORDER | SWP_SHOWWINDOW);
-    }
+    if (s_Mode == WindowMode::Windowed)
+        ShowWindow(s_Win32Handle, s_Maximized ? SW_MAXIMIZE : SW_NORMAL);
 }
 
 void Window::setMinimized(bool b)
 {
     s_Minimized = b;
 
-    if (b)
-    {
-        ShowWindow(s_Win32Handle, SW_MINIMIZE);
-    }
-    else if (s_Mode == WindowMode::Windowed)
-    {
-        RECT newWindow = { (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2,
-            (s_MonitorWidth + s_UnmaximizedWidth) / 2, (s_MonitorHeight + s_UnmaximizedHeight) / 2 };
-        AdjustWindowRectEx(&newWindow, s_WindowedStyle, FALSE, s_WindowedExStyle);
-
-        SetWindowPos(s_Win32Handle, HWND_TOP, newWindow.left, newWindow.top,
-            newWindow.right - newWindow.left, newWindow.bottom - newWindow.top, SWP_NOZORDER);
-
-        ShowWindow(s_Win32Handle, s_Maximized ? SW_MAXIMIZE : SW_NORMAL);
-    }
-    else if (s_Mode == WindowMode::WindowedBorderless)
-    {
-        SetWindowPos(s_Win32Handle, HWND_TOP, (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2,
-            s_UnmaximizedWidth, s_UnmaximizedHeight, SWP_NOZORDER);
-    }
-    else
-    {
-        SetWindowPos(s_Win32Handle, HWND_TOP, 0, 0, s_MonitorWidth, s_MonitorHeight, SWP_NOZORDER);
-    }
+    ShowWindow(s_Win32Handle, s_Minimized ? SW_MINIMIZE : (s_Maximized && s_Mode == WindowMode::Windowed) ? SW_MAXIMIZE : SW_NORMAL);
 }
 
 bool Window::isMaximized()
@@ -400,57 +340,13 @@ void Window::setWindowMode(WindowMode mode)
         setFullscreen(false);
 
     if (mode == WindowMode::Windowed)
-    {
-        SetWindowLong(s_Win32Handle, GWL_STYLE, s_WindowedStyle);
-        SetWindowLong(s_Win32Handle, GWL_EXSTYLE, s_WindowedExStyle);
-    }
+        setDecorated(true);
     else if (s_Mode == WindowMode::Windowed)
-    {
-        SetWindowLong(s_Win32Handle, GWL_STYLE, 0);
-        SetWindowLong(s_Win32Handle, GWL_EXSTYLE, 0);
-    }
-
-    s_IgnoreSizeMessage = false;
+        setDecorated(false);
 
     s_Mode = mode;
 
-    if (s_Mode == WindowMode::Windowed)
-    {
-        if (s_Maximized)
-            ShowWindow(s_Win32Handle, SW_MAXIMIZE);
-        else if (s_Minimized)
-            ShowWindow(s_Win32Handle, SW_MINIMIZE);
-        else
-        {
-            RECT newWindow = { (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2,
-                (s_MonitorWidth + s_UnmaximizedWidth) / 2, (s_MonitorHeight + s_UnmaximizedHeight) / 2 };
-            AdjustWindowRectEx(&newWindow, s_WindowedStyle, FALSE, s_WindowedExStyle);
-
-            SetWindowPos(s_Win32Handle, HWND_TOP, newWindow.left, newWindow.top,
-                newWindow.right - newWindow.left, newWindow.bottom - newWindow.top, SWP_NOZORDER);
-
-            ShowWindow(s_Win32Handle, SW_NORMAL);
-        }
-    }
-    else if (s_Mode == WindowMode::WindowedBorderless)
-    {
-        if (s_Minimized)
-            ShowWindow(s_Win32Handle, SW_MINIMIZE);
-        else
-        {
-            SetWindowPos(s_Win32Handle, HWND_TOP, (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2,
-                s_UnmaximizedWidth, s_UnmaximizedHeight, SWP_NOZORDER | SWP_SHOWWINDOW);
-        }
-    }
-    else
-    {
-        if (s_Minimized)
-            ShowWindow(s_Win32Handle, SW_MINIMIZE);
-        else
-        {
-            SetWindowPos(s_Win32Handle, HWND_TOP, 0, 0, s_MonitorWidth, s_MonitorHeight, SWP_NOZORDER | SWP_SHOWWINDOW);
-        }
-    }
+    updateWindowSize();
 }
 
 void Window::setClearColor(const Color& color)
@@ -642,9 +538,10 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
     case WM_SIZE:
         if (!s_IgnoreSizeMessage)
         {
-            s_Minimized = wParam == SIZE_MINIMIZED;
-            if (s_Mode == WindowMode::Windowed)
-                s_Maximized = wParam == SIZE_MAXIMIZED;
+            if (wParam == SIZE_MINIMIZED)
+                s_Minimized = true;
+            else if (s_Mode == WindowMode::Windowed && wParam == SIZE_MAXIMIZED)
+                s_Maximized = true;
 
             onResized((int)LOWORD(lParam), (int)HIWORD(lParam));
         }
@@ -681,11 +578,29 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
 }
 
 
+static void initTimer()
+{
+    QueryPerformanceFrequency((LARGE_INTEGER*)&s_TimerFrequency);
+    QueryPerformanceCounter((LARGE_INTEGER*)&s_TimerOffset);
+}
+
+static void initStyle()
+{
+    s_WindowedStyle = (WS_OVERLAPPED | WS_CAPTION);
+    s_WindowedExStyle = 0;
+
+    if (s_Info.closeButton)
+        s_WindowedStyle |= WS_SYSMENU;
+
+    if (s_Info.resizable)
+        s_WindowedStyle |= (WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME);
+}
+
 static void initCursors()
 {
     for (auto& [name, cursor] : s_Info.cursors)
     {
-        if (HCURSOR handle = createCursor(cursor); 
+        if (HCURSOR handle = (HCURSOR)createNativeIcon(cursor.width, cursor.height, cursor.bitmap, TRUE, cursor.hotspotX, cursor.hotspotY); 
                 handle)
             s_Cursors.emplace(name, handle);
     }
@@ -730,8 +645,8 @@ static void initIcons()
         }
     }
 
-    smallIconHandle = createIcon(smallIcon);
-    largeIconHandle = createIcon(largeIcon);
+    smallIconHandle = createNativeIcon(smallIcon.width, smallIcon.height, smallIcon.bitmap);
+    largeIconHandle = createNativeIcon(largeIcon.width, largeIcon.height, largeIcon.bitmap);
 
     if (smallIconHandle)
         SendMessage(s_Win32Handle, WM_SETICON, ICON_SMALL, (LPARAM)smallIconHandle);
@@ -739,33 +654,22 @@ static void initIcons()
         SendMessage(s_Win32Handle, WM_SETICON, ICON_BIG, (LPARAM)largeIconHandle);
 }
 
-HICON createIcon(const IconInfo& icon)
+static HICON createNativeIcon(int width, int height, uint8_t* bitmap, int isCursor, int hotspotX, int hotspotY)
 {
-    if (!icon.bitmap)
+    if (!bitmap)
         return NULL;
 
-    HICON iconHandle;
+    HICON handle;
     HBITMAP color, mask;
-    BITMAPV5HEADER bi = {};
-    ICONINFO iconInfo = {};
-    uint8_t* bitmapSrc;
-
-    bi.bV5Size = sizeof(BITMAPV5HEADER);
-    bi.bV5Width = icon.width;
-    bi.bV5Height = -icon.height;
-    bi.bV5Planes = 1;
-    bi.bV5BitCount = 32;
-    bi.bV5Compression = BI_BITFIELDS;
-    bi.bV5RedMask = 0x00ff0000;
-    bi.bV5GreenMask = 0x0000ff00;
-    bi.bV5BlueMask = 0x000000ff;
-    bi.bV5AlphaMask = 0xff000000;
+    BITMAPV5HEADER bi = createBitmapHeader(width, -height);
+    ICONINFO info = {};
+    uint8_t* nativeBitmap;
 
     HDC dc = GetDC(NULL);
     color = CreateDIBSection(dc, (BITMAPINFO*)&bi, DIB_RGB_COLORS,
-        (void**)&bitmapSrc, NULL, (DWORD)0);
+        (void**)&nativeBitmap, NULL, (DWORD)0);
 
-    mask = CreateBitmap(icon.width, icon.height, 1, 1, NULL);
+    mask = CreateBitmap(width, height, 1, 1, NULL);
     ReleaseDC(NULL, dc);
 
     if (!color || !mask)
@@ -774,42 +678,35 @@ HICON createIcon(const IconInfo& icon)
         return NULL;
     }
 
-    std::copy(icon.bitmap, icon.bitmap + 4 * icon.width * icon.height, bitmapSrc);
+    std::copy(bitmap, bitmap + 4 * width * height, nativeBitmap);
 
-    iconInfo.fIcon = TRUE;
-    iconInfo.xHotspot = 0;
-    iconInfo.yHotspot = 0;
-    iconInfo.hbmMask = mask;
-    iconInfo.hbmColor = color;
+    info.fIcon = isCursor;
+    info.xHotspot = hotspotX;
+    info.yHotspot = hotspotY;
+    info.hbmMask = mask;
+    info.hbmColor = color;
 
-    iconHandle = CreateIconIndirect(&iconInfo);
+    handle = CreateIconIndirect(&info);
 
     DeleteObject(color);
     DeleteObject(mask);
 
-    if (!iconHandle)
+    if (!handle)
     {
         std::cout << "Error: Could not create win32 icon" << std::endl;
         return NULL;
     }
 
-    return iconHandle;
+    return handle;
 }
 
-static HCURSOR createCursor(const CursorInfo& cursor)
+static BITMAPV5HEADER createBitmapHeader(int width, int height)
 {
-    if (!cursor.bitmap)
-        return NULL;
-
-    HICON cursorHandle;
-    HBITMAP color, mask;
     BITMAPV5HEADER bi = {};
-    ICONINFO cursorInfo = {};
-    uint8_t* bitmapSrc;
 
     bi.bV5Size = sizeof(BITMAPV5HEADER);
-    bi.bV5Width = cursor.width;
-    bi.bV5Height = -cursor.height;
+    bi.bV5Width = width;
+    bi.bV5Height = height;
     bi.bV5Planes = 1;
     bi.bV5BitCount = 32;
     bi.bV5Compression = BI_BITFIELDS;
@@ -818,39 +715,15 @@ static HCURSOR createCursor(const CursorInfo& cursor)
     bi.bV5BlueMask = 0x000000ff;
     bi.bV5AlphaMask = 0xff000000;
 
-    HDC dc = GetDC(NULL);
-    color = CreateDIBSection(dc, (BITMAPINFO*)&bi, DIB_RGB_COLORS,
-        (void**)&bitmapSrc, NULL, (DWORD)0);
+    return bi;
+}
 
-    mask = CreateBitmap(cursor.width, cursor.height, 1, 1, NULL);
-    ReleaseDC(NULL, dc);
-
-    if (!color || !mask)
-    {
-        std::cout << "Error: Could not create win32 bitmaps" << std::endl;
-        return NULL;
-    }
-
-    std::copy(cursor.bitmap, cursor.bitmap + 4 * cursor.width * cursor.height, bitmapSrc);
-
-    cursorInfo.fIcon = FALSE;
-    cursorInfo.xHotspot = cursor.hotspotX;
-    cursorInfo.yHotspot = cursor.hotspotY;
-    cursorInfo.hbmMask = mask;
-    cursorInfo.hbmColor = color;
-
-    cursorHandle = CreateIconIndirect(&cursorInfo);
-
-    DeleteObject(color);
-    DeleteObject(mask);
-
-    if (!cursorHandle)
-    {
-        std::cout << "Error: Could not create win32 cursor" << std::endl;
-        return NULL;
-    }
-
-    return cursorHandle;
+static void setDecorated(bool decorated)
+{
+    s_IgnoreSizeMessage = true;
+    SetWindowLong(s_Win32Handle, GWL_STYLE, decorated ? s_WindowedStyle : 0);
+    SetWindowLong(s_Win32Handle, GWL_EXSTYLE, decorated ? s_WindowedExStyle : 0);
+    s_IgnoreSizeMessage = false;
 }
 
 static void adjustSize(int width, int height)
@@ -858,21 +731,7 @@ static void adjustSize(int width, int height)
     s_UnmaximizedWidth = (int)width;
     s_UnmaximizedHeight = height;
 
-    if (s_Mode == WindowMode::Windowed)
-    {
-        RECT newWindow = { s_MonitorWidth - s_UnmaximizedWidth, s_MonitorHeight - s_UnmaximizedHeight, s_UnmaximizedWidth, s_UnmaximizedHeight };
-        AdjustWindowRectEx(&newWindow, s_WindowedStyle, FALSE, s_WindowedExStyle);
-
-        SetWindowPos(s_Win32Handle, HWND_TOP, newWindow.left, newWindow.top,
-            newWindow.right - newWindow.left, newWindow.bottom - newWindow.top, SWP_NOZORDER);
-
-        ShowWindow(s_Win32Handle, s_Maximized ? SW_MAXIMIZE : s_Minimized ? SW_MINIMIZE : SW_NORMAL);
-    }
-    else if (s_Mode == WindowMode::WindowedBorderless)
-    {
-        SetWindowPos(s_Win32Handle, HWND_TOP, (s_MonitorWidth - width) / 2, (s_MonitorHeight - height) / 2,
-            width, height, SWP_NOZORDER);
-    }
+    updateWindowSize();
 }
 
 static void setFullscreen(bool fullscreen)
@@ -899,6 +758,33 @@ static void setFullscreen(bool fullscreen)
         LONG success = ChangeDisplaySettingsEx(displayDevice.DeviceName, NULL, NULL, CDS_FULLSCREEN, NULL);
         if (success != DISP_CHANGE_SUCCESSFUL)
             std::cout << "Error" << std::endl;
+    }
+}
+
+static void updateWindowSize()
+{
+    if (s_Mode == WindowMode::Windowed)
+    {
+        RECT newWindow = { (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2,
+            (s_MonitorWidth + s_UnmaximizedWidth) / 2, (s_MonitorHeight + s_UnmaximizedHeight) / 2 };
+        AdjustWindowRectEx(&newWindow, s_WindowedStyle, FALSE, s_WindowedExStyle);
+
+        SetWindowPos(s_Win32Handle, HWND_TOP, newWindow.left, newWindow.top,
+            newWindow.right - newWindow.left, newWindow.bottom - newWindow.top, SWP_NOZORDER);
+
+        ShowWindow(s_Win32Handle, s_Maximized ? SW_MAXIMIZE : s_Minimized ? SW_MINIMIZE : SW_NORMAL);
+    }
+    else if (s_Mode == WindowMode::WindowedBorderless)
+    {
+        SetWindowPos(s_Win32Handle, HWND_TOP, (s_MonitorWidth - s_UnmaximizedWidth) / 2, (s_MonitorHeight - s_UnmaximizedHeight) / 2,
+            s_UnmaximizedWidth, s_UnmaximizedHeight, SWP_NOZORDER);
+
+        ShowWindow(s_Win32Handle, s_Minimized ? SW_MINIMIZE : SW_SHOW);
+    }
+    else
+    {
+        SetWindowPos(s_Win32Handle, HWND_TOP, 0, 0, s_MonitorWidth, s_MonitorHeight, SWP_NOZORDER);
+        ShowWindow(s_Win32Handle, s_Minimized ? SW_MINIMIZE : SW_SHOW);
     }
 }
 

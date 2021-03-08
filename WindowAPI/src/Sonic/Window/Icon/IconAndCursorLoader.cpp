@@ -1,6 +1,6 @@
 #include <filesystem>
 #include <stb/stb_image.h>
-#include "Sonic/Log/Log.h"
+#include "Sonic/Debug/Log/Log.h"
 #include "Sonic/Window/Window.h"
 #include "Sonic/Util/StringUtils.h"
 #include "IconAndCursorLoader.h"

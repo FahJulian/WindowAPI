@@ -92,8 +92,8 @@ static void loadJson(WindowInfo* info, InputFileStream file)
 		}
 	}
 
-	if (json.contains("name"))
-		info->title = json["name"].get<String>();
+	if (json.contains("title"))
+		info->title = json["title"].get<String>();
 	if (json.contains("mode"))
 		info->mode = toWindowMode(json["mode"].get<String>());
 	if (json.contains("saveTitle"))
