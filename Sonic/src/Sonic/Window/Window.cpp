@@ -1,27 +1,16 @@
-#include <limits>
-#include <iostream>
 #include <gl/glew.h>
 #include <gl/wglew.h>
+#include "_WIN32Include.h"
 #include "Sonic/Debug/Log/Log.h"
+#include "Sonic/Event/EventDispatcher.h"
 #include "Sonic/Event/Events/WindowEvents.h"
 #include "Sonic/Event/Events/MouseEvents.h"
 #include "Sonic/Event/Events/KeyEvents.h"
 #include "Sonic/Util/StringUtils.h"
-#include "Input/Keyboard.h"
-#include "Input/Mouse.h"
-#include "_WIN32Include.h"
+#include "WindowInfoLoader.h"
 #include "Window.h"
 
 using namespace Sonic;
-
-
-struct WindowDimensions
-{
-    int x;
-    int y;
-    int width;
-    int height;
-};
 
 
 static WindowInfo s_Info;
@@ -73,6 +62,11 @@ static void setFullscreen(bool fullscreen);
 static void updateWindowSize();
 static Key getKey(LPARAM lParam, WPARAM wParam);
 
+
+bool Window::init(const String& infoFilePath, bool overrideBinary)
+{ 
+    return init(Util::loadWindowInfo(infoFilePath, overrideBinary)); 
+}
 
 bool Window::init(const WindowInfo& info)
 {
@@ -237,21 +231,21 @@ void Window::onResized(int width, int height)
         s_CurrentWidth = width;
         s_CurrentHeight = height;
 
-        SONIC_EVENT_FN(WindowResizedEvent(static_cast<float>(width), static_cast<float>(height)));
+        EventDispatcher::dispatch(WindowResizedEvent(static_cast<float>(width), static_cast<float>(height)));
     }
 }
 
 void Window::onMouseButtonPressed(MouseButton button)
 {
     Mouse::s_Buttons[button] = true;
-    SONIC_EVENT_FN(MouseButtonPressedEvent(button, Mouse::s_X, Mouse::s_Y));
+    EventDispatcher::dispatch(MouseButtonPressedEvent(button, Mouse::s_X, Mouse::s_Y));
     SetCapture(s_Win32Handle);
 }
 
 void Window::onMouseButtonReleased(MouseButton button)
 {
     Mouse::s_Buttons[button] = false;
-    SONIC_EVENT_FN(MouseButtonReleasedEvent(button, Mouse::s_X, Mouse::s_Y));
+    EventDispatcher::dispatch(MouseButtonReleasedEvent(button, Mouse::s_X, Mouse::s_Y));
     ReleaseCapture();
 }
 
@@ -382,7 +376,7 @@ void Window::setCursor(const String& name)
 
 void Window::clear()
 {
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 }
 
 void Window::swapBuffers()
@@ -444,7 +438,7 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
     {
     case WM_CLOSE: [[fallthrough]];
     case WM_QUIT:
-        SONIC_EVENT_FN(WindowClosedEvent());
+        EventDispatcher::dispatch(WindowClosedEvent());
         return 0;
 
     case WM_LBUTTONDOWN:
@@ -492,15 +486,15 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
 
         for (MouseButton button = 0; button < Mouse::s_Buttons.size(); button++)
             if (Mouse::s_Buttons[button])
-                SONIC_EVENT_FN(MouseDraggedEvent(button, Mouse::s_X, Mouse::s_Y, beforeX, beforeY, deltaX, deltaY));
+                EventDispatcher::dispatch(MouseDraggedEvent(button, Mouse::s_X, Mouse::s_Y, beforeX, beforeY, deltaX, deltaY));
 
-        SONIC_EVENT_FN(MouseMovedEvent(Mouse::s_X, Mouse::s_Y, beforeX, beforeY, deltaX, deltaY));
+        EventDispatcher::dispatch(MouseMovedEvent(Mouse::s_X, Mouse::s_Y, beforeX, beforeY, deltaX, deltaY));
 
         return 0;
     }
 
     case WM_MOUSEWHEEL:
-        SONIC_EVENT_FN(MouseScrolledEvent(Mouse::s_X, Mouse::s_Y, 0.0f, (float)GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA));
+        EventDispatcher::dispatch(MouseScrolledEvent(Mouse::s_X, Mouse::s_Y, 0.0f, (float)GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA));
         return 0;
 
     case WM_SYSKEYDOWN: [[fallthrough]];
@@ -516,10 +510,10 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
         }
 
         Keyboard::s_Keys[key] = true;
-        SONIC_EVENT_FN(KeyPressedEvent(key, keyChar));
+        EventDispatcher::dispatch(KeyPressedEvent(key, keyChar));
 
         if (s_Info.closeOnAltF4 && key == Keys::F4 && Keyboard::isKeyPressed(Keys::Alt))
-            SONIC_EVENT_FN(WindowClosedEvent());
+            EventDispatcher::dispatch(WindowClosedEvent());
 
         return 0;
     }
@@ -530,7 +524,7 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
         Key key = getKey(lParam, wParam);
 
         Keyboard::s_Keys[key] = false;
-        SONIC_EVENT_FN(KeyReleasedEvent(key));
+        EventDispatcher::dispatch(KeyReleasedEvent(key));
 
         return 0;
     }
@@ -548,7 +542,7 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
         return 0;
 
     case WM_KILLFOCUS:
-        SONIC_EVENT_FN(WindowLostFocusEvent());
+        EventDispatcher::dispatch(WindowLostFocusEvent());
 
         if (s_Mode == WindowMode::Fullscreen)
             ShowWindow(s_Win32Handle, SW_MINIMIZE);
@@ -559,7 +553,7 @@ LRESULT CALLBACK Window::WindowProc(HWND handle, UINT msg, WPARAM wParam, LPARAM
         Mouse::s_Buttons = { false };
         Keyboard::s_Keys = { false };
 
-        SONIC_EVENT_FN(WindowGainedFocusEvent());
+        EventDispatcher::dispatch(WindowGainedFocusEvent());
         return 0;
 
     case WM_SETCURSOR:
@@ -674,7 +668,7 @@ static HICON createNativeIcon(int width, int height, uint8_t* bitmap, int isCurs
 
     if (!color || !mask)
     {
-        std::cout << "Error: Could not create win32 bitmaps" << std::endl;
+        SONIC_LOG_ERROR("Error: Could not create win32 bitmaps");
         return NULL;
     }
 
@@ -693,7 +687,7 @@ static HICON createNativeIcon(int width, int height, uint8_t* bitmap, int isCurs
 
     if (!handle)
     {
-        std::cout << "Error: Could not create win32 icon" << std::endl;
+        SONIC_LOG_ERROR("Error: Could not create win32 ", isCursor ? "cursor" : "icon");
         return NULL;
     }
 
@@ -751,13 +745,13 @@ static void setFullscreen(bool fullscreen)
 
         LONG success = ChangeDisplaySettingsEx(displayDevice.DeviceName, &deviceMode, NULL, CDS_FULLSCREEN, NULL);
         if (success != DISP_CHANGE_SUCCESSFUL)
-            std::cout << "Error" << std::endl;
+            SONIC_LOG_ERROR("Error changing display settings");
     }
     else
     {
         LONG success = ChangeDisplaySettingsEx(displayDevice.DeviceName, NULL, NULL, CDS_FULLSCREEN, NULL);
         if (success != DISP_CHANGE_SUCCESSFUL)
-            std::cout << "Error" << std::endl;
+            SONIC_LOG_ERROR("Error changing display settings");
     }
 }
 

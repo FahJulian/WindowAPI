@@ -1,13 +1,4 @@
-#include <iostream>
-#include <Sonic/Event/EventDispatcher.h>
-#include "Sonic/Base.h"
-#include "Sonic/Util/StringUtils.h"
-#include "Sonic/Event/Events/KeyEvents.h"
-#include "Sonic/Event/Events/MouseEvents.h"
-#include "Sonic/Event/Events/WindowEvents.h"
-#include "Sonic/Window/Window.h"
-#include "Sonic/Window/WindowInfoLoader.h"
-#include "Sonic/Window/Input/Keyboard.h"
+#include <Sonic.h>
 
 using namespace Sonic;
 

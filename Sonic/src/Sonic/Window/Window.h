@@ -1,13 +1,9 @@
 #pragma once
-#include <Sonic/Event/EventDispatcher.h>
 #include "Sonic/Graphics/Color.h"
+#include "Input/Keyboard.h"
 #include "Input/Mouse.h"
 #include "WindowInfo.h"
-#include "WindowInfoLoader.h"
 
-#ifndef SONIC_EVENT_FN
-	#define SONIC_EVENT_FN(e) EventDispatcher::dispatch(e)
-#endif
 
 struct HWND__;
 
@@ -47,7 +43,7 @@ namespace Sonic {
 		static bool createContext();
 	public:
 		static bool init(const WindowInfo& info);
-		static bool init(const String& infoFilePath, bool overrideBinary = false) { return init(Util::loadWindowInfo(infoFilePath, overrideBinary)); }
+		static bool init(const String& infoFilePath, bool overrideBinary = false);
 
 		static void saveInfo();
 		static void destroy();
